@@ -23,6 +23,19 @@ var quick_request: HTTPRequest
 var quick_outbox: Array = []
 var quick_pending_id := ""
 const QUICK_OUTBOX := "user://confirmed-feedback-v1.json"
+const VisualPick = preload("res://lab/visual_pick.gd")
+var touch_starts := {}
+var gesture_moved := false
+var selected_outline: Line2D
+var selected_title: Label
+var quick_edit_drag := false
+var quick_drag_button: Button
+var drag_steps := 0.0
+var quick_draft := false
+var quick_detail_scroll: ScrollContainer
+var quick_expanded := false
+var quick_choice_pending := false
+var quick_verdict: OptionButton
 var camera_pan_mode := true
 var camera_gesture_button: Button
 var quick_gesture_button: Button
@@ -297,6 +310,11 @@ func _create_ui() -> void:
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.theme = _mobile_theme()
+	selected_outline = Line2D.new()
+	selected_outline.width = 2.0
+	selected_outline.default_color = Color("#62e2cd")
+	root.add_child(selected_outline)
+	selected_outline.hide()
 	var top := HBoxContainer.new()
 	root.add_child(top)
 	hud_top = top
@@ -734,7 +752,7 @@ func _section_heading(parent: VBoxContainer, title: String, subtitle: String) ->
 
 func _set_settings(open: bool) -> void:
 	if open and is_instance_valid(quick_panel):
-		quick_panel.hide()
+		_close_quick_menu()
 	var was_open := settings_open
 	settings_open = open
 	if not open:
@@ -743,6 +761,7 @@ func _set_settings(open: bool) -> void:
 			_save_reviews()
 		_close_choices()
 	touches.clear()
+	touch_starts.clear()
 	catalog_panel.visible = open
 	hud_top.visible = not open
 	camera_gesture_button.visible = not open
@@ -823,7 +842,12 @@ func _create_choice_overlay(root: Control) -> void:
 	var back := Button.new()
 	back.text = "Voltar"
 	header.add_child(back)
-	back.pressed.connect(_close_choices)
+	back.pressed.connect(func():
+		_close_choices()
+		if quick_choice_pending:
+			quick_choice_pending = false
+			_open_target(quick_target.get_selected_id())
+	)
 	choice_search = LineEdit.new()
 	choice_search.placeholder_text = "Pesquisar..."
 	choice_search.clear_button_enabled = true
@@ -901,6 +925,9 @@ func _choose_search_result(index: int) -> void:
 	picker.select(index)
 	picker.item_selected.emit(index)
 	_refresh_picker_labels()
+	if quick_choice_pending:
+		quick_choice_pending = false
+		_open_target(quick_target.get_selected_id())
 
 func _set_menu_transparency(value: float) -> void:
 	menu_transparency = clampf(value, 0.0, 90.0)
@@ -1600,6 +1627,7 @@ func _process(delta: float) -> void:
 			_refresh_equipped_scale()
 		if is_instance_valid(quick_panel) and quick_panel.visible:
 			_refresh_quick_readout()
+			_update_selection_outline()
 		if is_instance_valid(inspection_controls) and inspection_controls.is_visible_in_tree():
 			_update_inspection()
 
@@ -1696,14 +1724,30 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event is InputEventScreenTouch:
 		if event.pressed:
+			if touches.is_empty():
+				gesture_moved = false
+				drag_steps = 0.0
 			touches[event.index] = event.position
+			touch_starts[event.index] = event.position
+			if touches.size() > 1:
+				gesture_moved = true
 		else:
+			var was_tracked := touches.has(event.index)
+			var start: Vector2 = touch_starts.get(event.index, event.position)
 			touches.erase(event.index)
+			touch_starts.erase(event.index)
+			if was_tracked and touches.is_empty() and not gesture_moved and start.distance_to(event.position) < 10.0:
+				_select_at_screen(event.position)
 	elif event is InputEventScreenDrag:
 		if not touches.has(event.index):
 			return
 		var previous: Vector2 = touches[event.index]
 		touches[event.index] = event.position
+		var start: Vector2 = touch_starts.get(event.index, previous)
+		if start.distance_to(event.position) >= 10.0:
+			gesture_moved = true
+		if not gesture_moved:
+			return
 		if touches.size() == 2:
 			for index in touches:
 				if index != event.index:
@@ -1714,12 +1758,15 @@ func _unhandled_input(event: InputEvent) -> void:
 					if before > 1.0 and after > 1.0:
 						distance = clampf(distance * before / after, 0.15 if item_mode else 0.45, 12.0)
 		elif touches.size() == 1:
-			if camera_pan_mode:
+			if quick_panel.visible and quick_edit_drag and is_instance_valid(quick_axis):
+				_drag_selected(event.position - previous)
+			elif camera_pan_mode:
 				_pan_camera(event.position - previous)
 			else:
 				yaw -= event.relative.x * 0.006
 				pitch = clampf(pitch + event.relative.y * 0.006, -0.15, 1.2)
 		_update_camera()
+		_update_selection_outline()
 
 func _pan_camera(delta: Vector2) -> void:
 	var rect := get_viewport().get_visible_rect()
@@ -1911,6 +1958,8 @@ func _review_entry() -> Dictionary:
 	entry["itemScale"] = _vjson(_object_scale(item_index))
 	entry["contextScale"] = _vjson(_object_scale(context_record_index))
 	entry["contextPosition"] = _vjson(context_root.position) if is_instance_valid(context_root) else []
+	entry["contextTransform"] = _tjson(context_root.transform) if is_instance_valid(context_root) else {}
+	entry["itemTransform"] = _tjson(item_node.transform) if is_instance_valid(item_node) else {}
 	entry["verdict"] = ["unreviewed", "approved", "needs_adjustment", "incompatible"][maxi(0, review_verdict.selected)]
 	entry["reviewedAt"] = Time.get_datetime_string_from_system(true) + "Z"
 	return entry
@@ -2998,7 +3047,7 @@ func _create_quick_menu(root: Control) -> void:
 	quick_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	quick_panel.offset_left = 12
 	quick_panel.offset_right = -12
-	quick_panel.offset_top = -460
+	quick_panel.offset_top = -490
 	quick_panel.clip_contents = true
 	quick_panel.add_theme_stylebox_override("panel", _flat(Color("#17212eea"), 22, 12))
 	quick_panel.offset_bottom = -16
@@ -3012,10 +3061,24 @@ func _create_quick_menu(root: Control) -> void:
 	header.add_child(quick_target)
 	quick_target.item_selected.connect(func(_index): _rebuild_quick_controls())
 	quick_target.fit_to_longest_item = false
+	var expand := _quick_button(header, "↕", _toggle_quick_expanded)
+	expand.custom_minimum_size.x = 52
+	expand.size_flags_horizontal = Control.SIZE_SHRINK_END
 	var close := _quick_button(header, "Fechar", _close_quick_menu)
 	close.size_flags_horizontal = Control.SIZE_SHRINK_END
+	selected_title = Label.new()
+	selected_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	selected_title.add_theme_font_size_override("font_size", 19)
+	layout.add_child(selected_title)
+	quick_detail_scroll = ScrollContainer.new()
+	quick_detail_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	quick_detail_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	quick_detail_scroll.custom_minimum_size.y = 126
+	layout.add_child(quick_detail_scroll)
 	quick_body = VBoxContainer.new()
-	layout.add_child(quick_body)
+	quick_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	quick_body.add_theme_constant_override("separation", 6)
+	quick_detail_scroll.add_child(quick_body)
 	quick_readout = Label.new()
 	quick_readout.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	quick_readout.add_theme_font_size_override("font_size", 19)
@@ -3024,12 +3087,14 @@ func _create_quick_menu(root: Control) -> void:
 	quick_notes.custom_minimum_size.y = 52
 	quick_notes.placeholder_text = "Observação (opcional)"
 	layout.add_child(quick_notes)
+	quick_verdict = OptionButton.new()
+	quick_verdict.fit_to_longest_item = false
+	for verdict in ["Não avaliado", "Aprovado", "Precisa de ajustes", "Incompatível"]:
+		quick_verdict.add_item(verdict)
+	layout.add_child(quick_verdict)
 	var actions := HBoxContainer.new()
 	layout.add_child(actions)
-	_quick_button(actions, "Mais opções", func():
-		_close_quick_menu()
-		_set_settings(true)
-	)
+	_quick_button(actions, "Avançado", _open_context_advanced)
 	var confirm := _quick_button(actions, "Confirmar", _confirm_quick_feedback)
 	confirm.add_theme_stylebox_override("normal", _flat(Color("#14665e"), 14, 8))
 	quick_status = Label.new()
@@ -3059,28 +3124,145 @@ func _open_quick_menu() -> void:
 	if quick_panel.visible:
 		_close_quick_menu()
 		return
-	quick_before = _review_entry()
-	quick_notes.text = ""
+	_open_target(2 if is_instance_valid(grip) else 0)
+
+func _open_target(target: int, slot: int = -1) -> void:
+	if not quick_draft:
+		quick_before = _review_entry()
+		quick_notes.text = ""
+		quick_verdict.select(0)
+		quick_draft = true
+	if slot >= 0:
+		_switch_slot(slot)
 	quick_target.clear()
-	quick_target.add_item("Câmera", 0)
+	quick_target.add_item("Câmera / cena", 0)
 	if item_mode:
-		quick_target.add_item("Peça", 4)
+		quick_target.add_item("Peça isolada", 4)
 	else:
 		if is_instance_valid(player):
-			quick_target.add_item("Movimento", 1)
-		if is_instance_valid(grip):
+			quick_target.add_item("Personagem / movimento", 1)
+		if is_instance_valid(skeleton):
 			quick_target.add_item("Equipamento", 2)
-		if is_instance_valid(context_root):
-			quick_target.add_item("Objeto", 3)
-	quick_target.select(quick_target.get_item_index(2) if quick_target.get_item_index(2) >= 0 else 0)
+		quick_target.add_item("Objeto de contexto", 3)
+	var idx := quick_target.get_item_index(target)
+	quick_target.select(idx if idx >= 0 else 0)
 	_rebuild_quick_controls()
 	quick_status.text = "Só envia ao confirmar · %d pendentes" % quick_outbox.size()
 	hud_nav.hide()
 	quick_panel.show()
+	_update_selection_outline()
 
 func _close_quick_menu() -> void:
 	quick_panel.hide()
+	quick_edit_drag = false
+	selected_outline.hide()
 	hud_nav.visible = not settings_open
+
+func _toggle_quick_expanded() -> void:
+	quick_expanded = not quick_expanded
+	quick_panel.offset_top = -715 if quick_expanded else -490
+
+func _open_context_advanced() -> void:
+	var target := quick_target.get_selected_id()
+	_close_quick_menu()
+	_set_settings(true)
+	_select_settings_section({0: 0, 1: 1, 2: 2, 3: 3, 4: 0}.get(target, 0))
+
+func _quick_choose(picker: OptionButton, title: String) -> void:
+	quick_choice_pending = true
+	quick_panel.hide()
+	selected_outline.hide()
+	_open_choices(picker, title)
+
+func _select_at_screen(point: Vector2) -> void:
+	var ray_from := camera.project_ray_origin(point)
+	var ray_to := ray_from + camera.project_ray_normal(point) * 100.0
+	var targets: Array = []
+	if item_mode:
+		targets.append([4, -1, item_node])
+	else:
+		for slot in [0, 1]:
+			var state: Dictionary = slot_states.get(slot, {})
+			var equipped: Node3D = grip if slot == active_slot else state.get("grip")
+			targets.append([2, slot, equipped])
+		targets.append([3, -1, context_root])
+		targets.append([1, -1, actor])
+	var best: Array = []
+	var best_distance := INF
+	for target in targets:
+		var node: Node3D = target[2]
+		if not is_instance_valid(node) or not node.is_visible_in_tree():
+			continue
+		var hit := VisualPick.hit_distance(node, ray_from, ray_to, int(target[0]) == 1)
+		# Equipment hit gets priority against the approximate skinned body bounds.
+		if int(target[0]) == 1 and not best.is_empty() and int(best[0]) == 2:
+			continue
+		if hit < best_distance:
+			best_distance = hit
+			best = target
+	if best.is_empty():
+		_open_target(0)
+	else:
+		_open_target(int(best[0]), int(best[1]))
+
+func _selected_node() -> Node3D:
+	match quick_target.get_selected_id():
+		1: return actor
+		2: return grip
+		3: return context_root
+		4: return item_node
+	return null
+
+func _update_selection_outline() -> void:
+	if not quick_panel.visible:
+		selected_outline.hide()
+		return
+	var node := _selected_node()
+	if not is_instance_valid(node):
+		selected_outline.hide()
+		return
+	var rect: Rect2 = VisualPick.screen_bounds(node, camera, quick_target.get_selected_id() == 1)
+	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
+		selected_outline.hide()
+		return
+	rect = rect.grow(4.0)
+	selected_outline.points = PackedVector2Array([rect.position, Vector2(rect.end.x, rect.position.y), rect.end, Vector2(rect.position.x, rect.end.y), rect.position])
+	selected_outline.show()
+
+func _focus_selected() -> void:
+	var node := _selected_node()
+	if not is_instance_valid(node):
+		return
+	var boxes: Array[AABB] = []
+	_collect_bounds(node, boxes)
+	if boxes.is_empty():
+		return
+	var bounds := boxes[0]
+	for i in range(1, boxes.size()):
+		bounds = bounds.merge(boxes[i])
+	focus = bounds.get_center()
+	distance = clampf(bounds.size.length() * 2.5, 0.45, 12.0)
+	_update_camera()
+
+func _drag_selected(delta: Vector2) -> void:
+	if not is_instance_valid(quick_axis):
+		return
+	var axis := quick_axis.selected
+	var node := _selected_node()
+	if not is_instance_valid(node):
+		return
+	var direction := Vector3.ZERO
+	direction[axis % 3] = 1.0
+	if quick_target.get_selected_id() == 2 and is_instance_valid(attachment):
+		direction = (attachment.global_transform.basis * direction).normalized()
+	var origin := node.global_position
+	var projected := camera.unproject_position(origin + direction) - camera.unproject_position(origin)
+	var pixels := delta.x - delta.y if axis >= 3 or projected.length() < 1.0 else delta.dot(projected.normalized())
+	drag_steps += pixels / 10.0
+	var steps := clampi(int(drag_steps), -8, 8)
+	drag_steps -= steps
+	for i in range(absi(steps)):
+		_quick_nudge(quick_target.get_selected_id(), quick_axis, 1 if steps > 0 else -1)
 
 func _quick_row() -> HBoxContainer:
 	var row := HBoxContainer.new()
@@ -3089,6 +3271,8 @@ func _quick_row() -> HBoxContainer:
 
 func _rebuild_quick_controls() -> void:
 	quick_axis = null
+	quick_drag_button = null
+	quick_edit_drag = false
 	quick_size = null
 	quick_time = null
 	quick_gesture_button = null
@@ -3096,6 +3280,7 @@ func _rebuild_quick_controls() -> void:
 		quick_body.remove_child(child)
 		child.queue_free()
 	var target := quick_target.get_selected_id()
+	quick_detail_scroll.scroll_vertical = 0
 	var row := _quick_row()
 	match target:
 		0:
@@ -3122,6 +3307,10 @@ func _rebuild_quick_controls() -> void:
 			)
 			iso.disabled = item_mode
 		1:
+			_quick_button(row, "Personagem", func(): _quick_choose(scene_picker, "Personagem"))
+			_quick_button(row, "Movimento", func(): _quick_choose(clip_picker, "Movimento"))
+			_quick_button(row, "Focar", _focus_selected)
+			row = _quick_row()
 			_quick_button(row, "Pausar", func(): player.pause())
 			_quick_button(row, "Reproduzir", _replay)
 			_quick_button(row, "Loop", func():
@@ -3136,16 +3325,52 @@ func _rebuild_quick_controls() -> void:
 			quick_time.custom_minimum_size.y = 36
 			quick_body.add_child(quick_time)
 			quick_time.value_changed.connect(_seek_phase)
+			row = _quick_row()
+			_quick_button(row, "Anterior", func(): _step_clip(-1))
+			_quick_button(row, "Próximo", func(): _step_clip(1))
+			var speed := OptionButton.new()
+			speed.fit_to_longest_item = false
+			speed.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			for value in SPEEDS:
+				speed.add_item("%s×" % str(value))
+			speed.select(speed_picker.selected)
+			row.add_child(speed)
+			speed.item_selected.connect(_set_speed)
 		2, 3, 4:
+			if target == 2:
+				_quick_button(row, "Trocar peça", func(): _quick_choose(equipment_picker, "Equipamento"))
+				_quick_button(row, "Trocar osso", func(): _quick_choose(bone_picker, "Osso de encaixe"))
+				_quick_button(row, "Mão E" if active_slot == 0 else "Mão D", func():
+					_switch_slot(1 - active_slot)
+					_rebuild_quick_controls()
+				)
+			elif target == 3:
+				_quick_button(row, "Trocar objeto", func(): _quick_choose(context_picker, "Objeto"))
+				_quick_button(row, "Focar", _focus_selected)
+			else:
+				_quick_button(row, "Trocar peça", func(): _quick_choose(item_picker, "Peça"))
+				_quick_button(row, "Focar", _focus_selected)
+			if not is_instance_valid(_selected_node()):
+				_refresh_quick_readout()
+				return
+			row = _quick_row()
 			quick_axis = OptionButton.new()
 			quick_axis.fit_to_longest_item = false
-			for label in (["Pos. X", "Pos. Y", "Pos. Z", "Rot. X", "Rot. Y", "Rot. Z"] if target == 2 else ["X", "Y", "Z"]):
+			for label in ["Pos. X", "Pos. Y", "Pos. Z", "Rot. X", "Rot. Y", "Rot. Z", "Escala X", "Escala Y", "Escala Z"]:
 				quick_axis.add_item(label)
 			row.add_child(quick_axis)
 			quick_axis.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			quick_axis.item_selected.connect(func(_index): _refresh_quick_readout())
 			_quick_button(row, "−", _quick_nudge.bind(target, quick_axis, -1))
 			_quick_button(row, "+", _quick_nudge.bind(target, quick_axis, 1))
+			row = _quick_row()
+			quick_drag_button = _quick_button(row, "Arrastar eixo: não", func():
+				quick_edit_drag = not quick_edit_drag
+				quick_drag_button.text = "Arrastar eixo: sim" if quick_edit_drag else "Arrastar eixo: não"
+			)
+			_quick_button(row, "Focar", _focus_selected)
+			if target == 2:
+				_quick_button(row, "Reset", _reset_grip)
 			row = _quick_row()
 			_quick_button(row, "Escala −5%", _quick_scale.bind(target, 0.95))
 			_quick_button(row, "Escala +5%", _quick_scale.bind(target, 1.05))
@@ -3156,7 +3381,15 @@ func _rebuild_quick_controls() -> void:
 			quick_size.custom_minimum_size.y = 36
 			quick_body.add_child(quick_size)
 			quick_size.value_changed.connect(_quick_set_size.bind(target))
+			row = _quick_row()
+			if target == 2:
+				_quick_button(row, "Salvar perfil", _save_category_grip)
+				_quick_button(row, "Capturar apoio", _capture_support)
+			elif target == 3:
+				_quick_button(row, "Capturar contato", _capture_context_ik.bind(false))
+				_quick_button(row, "Alinhar", _align_push_demo)
 	_refresh_quick_readout()
+	_update_selection_outline()
 
 func _quick_set_size(percent: float, target: int) -> void:
 	if target == 2 and is_instance_valid(grip):
@@ -3172,6 +3405,18 @@ func _refresh_quick_readout() -> void:
 	if not is_instance_valid(quick_readout) or not is_instance_valid(quick_target):
 		return
 	var target := quick_target.get_selected_id()
+	var label := "Cena e câmera"
+	if target == 1 and scene_picker.selected >= 0 and scene_picker.selected < records.size():
+		label = Labels.scene(records[scene_picker.selected], scene_picker.selected)
+	elif target == 2:
+		label = "Mão direita" if active_slot == 0 else "Mão esquerda"
+		if equipped_index >= 0:
+			label += " · " + Labels.item(str(items[equipped_index]["name"]), equipped_index)
+	elif target == 3:
+		label = Labels.item(str(items[context_record_index]["name"]), context_record_index) if context_record_index >= 0 else "Sem objeto"
+	elif target == 4:
+		label = Labels.item(str(items[item_index]["name"]), item_index) if item_index >= 0 else "Sem peça"
+	selected_title.text = label
 	match target:
 		0:
 			quick_readout.text = "%s · distância %.2f m\n1 dedo: %s · 2 dedos: mover/zoom" % ["Isométrica" if isometric_view and not item_mode else "Perspectiva", distance, "mover" if camera_pan_mode else "girar"]
@@ -3183,19 +3428,24 @@ func _refresh_quick_readout() -> void:
 				quick_time.set_value_no_signal(t / length if length > 0.0 else 0.0)
 		2:
 			if not is_instance_valid(grip):
+				quick_readout.text = "Escolha uma peça para a mão selecionada."
 				return
 			var axis := quick_axis.selected if is_instance_valid(quick_axis) else 0
-			var value := grip.rotation_degrees[axis - 3] if axis >= 3 else grip.position[axis]
-			var unit := "°" if axis >= 3 else " un. local"
+			var value := grip.scale[axis - 6] * 100.0 if axis >= 6 else (grip.rotation_degrees[axis - 3] if axis >= 3 else grip.position[axis])
+			var unit := "%" if axis >= 6 else ("°" if axis >= 3 else " un. local")
 			quick_readout.text = "Eixo: %.3f%s · escala %.1f%%\nPasso: 1 mm / 1°" % [value, unit, grip.scale.x * 100.0]
 			if is_instance_valid(quick_size):
 				quick_size.set_value_no_signal(grip.scale.x * 100.0)
 		3, 4:
 			var index := context_record_index if target == 3 else item_index
+			if index < 0:
+				quick_readout.text = "Selecione um objeto para editar."
+				return
 			var factors := _object_scale(index)
 			quick_readout.text = "Escala X/Y/Z: %.0f / %.0f / %.0f%%" % [factors.x * 100.0, factors.y * 100.0, factors.z * 100.0]
-			if target == 3:
-				quick_readout.text += "\nPos. %.2f / %.2f / %.2f m" % [context_offset.x, context_offset.y, context_offset.z]
+			var node := _selected_node()
+			if is_instance_valid(node):
+				quick_readout.text += "\nP %.2f / %.2f / %.2f m · R %.0f / %.0f / %.0f°" % [node.position.x, node.position.y, node.position.z, node.rotation_degrees.x, node.rotation_degrees.y, node.rotation_degrees.z]
 			if is_instance_valid(quick_size):
 				quick_size.set_value_no_signal(factors.x * 100.0)
 
@@ -3204,19 +3454,44 @@ func _quick_zoom(factor: float) -> void:
 	_update_camera()
 
 func _quick_nudge(target: int, axis: OptionButton, direction: int) -> void:
-	if target == 2:
-		axis_picker.select(axis.selected)
+	var component := axis.selected
+	if not is_instance_valid(_selected_node()):
+		return
+	if component >= 6:
+		if target == 2:
+			var anchor: Vector3 = grip.get_meta("fit_anchor", Vector3.ZERO)
+			var contact := grip.transform * anchor
+			var factors := grip.scale
+			factors[component - 6] = clampf(factors[component - 6] * (1.01 if direction > 0 else 1.0 / 1.01), MIN_EQUIPMENT_SCALE, MAX_OBJECT_SCALE)
+			grip.scale = factors
+			grip.position += contact - grip.transform * anchor
+			grip_source = "manual"
+			grip_profiles[active_profile] = grip.transform
+			_save_grip_profiles()
+			_update_grip_label()
+		else:
+			var index := 1 if target == 3 else 0
+			var picker: OptionButton = scale_controls[index]["axis"]
+			picker.select(component - 5)
+			var scale_now := _object_scale(_scale_record_index(index))
+			_set_object_scale(scale_now[component - 6] * 100.0 + direction * 1.0, index)
+	elif target == 2:
+		axis_picker.select(component)
 		fine_grip.button_pressed = true
 		_adjust_grip(direction)
 	elif target == 3:
-		context_axis.select(axis.selected)
-		_adjust_context(direction)
+		if component < 3:
+			context_offset[component] = clampf(context_offset[component] + 0.01 * direction, -4.0, 4.0)
+			_update_context()
+		else:
+			context_root.rotation_degrees[component - 3] += direction
 	elif target == 4:
-		var picker: OptionButton = scale_controls[0]["axis"]
-		picker.select(axis.selected + 1)
-		var scale_now := _object_scale(item_index)
-		_set_object_scale(scale_now[axis.selected] * 100.0 + direction * 1.0, 0)
+		if component < 3:
+			item_node.position[component] += 0.01 * direction
+		else:
+			item_node.rotation_degrees[component - 3] += direction
 	_refresh_quick_readout()
+	_update_selection_outline()
 
 func _quick_scale(target: int, factor: float) -> void:
 	if target == 2 and is_instance_valid(grip):
@@ -3245,8 +3520,10 @@ func _save_quick_outbox() -> bool:
 
 func _confirm_quick_feedback() -> void:
 	var after := _review_entry()
+	quick_draft = true
 	after["notes"] = quick_notes.text
 	after["editTarget"] = quick_target.get_selected_id()
+	after["verdict"] = ["unreviewed", "approved", "needs_adjustment", "incompatible"][maxi(0, quick_verdict.selected)]
 	var id := Crypto.new().generate_random_bytes(16).hex_encode()
 	var entry := {"schemaVersion": 1, "id": id, "before": quick_before.duplicate(true), "after": after}
 	quick_outbox.append(entry)
@@ -3256,6 +3533,8 @@ func _confirm_quick_feedback() -> void:
 		return
 	quick_before = after.duplicate(true)
 	quick_notes.text = ""
+	quick_draft = true
+	quick_verdict.select(0)
 	quick_status.text = "Confirmado. %d na fila." % quick_outbox.size()
 	if is_instance_valid(quick_token) and not quick_token.text.strip_edges().is_empty():
 		_send_quick_feedback()

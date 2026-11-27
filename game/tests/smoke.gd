@@ -438,6 +438,32 @@ func _run() -> void:
 		return
 	lab._toggle_camera_gesture()
 	lab._close_quick_menu()
+	lab._set_mode(1)
+	await process_frame
+	var picker = preload("res://lab/visual_pick.gd")
+	var bounds: Rect2 = picker.screen_bounds(lab.item_node, lab.camera)
+	if bounds.size.x <= 0.0 or bounds.size.y <= 0.0:
+		push_error("Item selection has no visible bounds")
+		quit(1)
+		return
+	lab._open_target(4)
+	if lab.quick_target.get_selected_id() != 4 or not lab.selected_outline.visible:
+		push_error("Context selection did not highlight item")
+		quit(1)
+		return
+	var original: Transform3D = lab.item_node.transform
+	lab.quick_axis.select(0)
+	lab._quick_nudge(4, lab.quick_axis, 1)
+	lab.quick_axis.select(4)
+	lab._quick_nudge(4, lab.quick_axis, 1)
+	var snapshot: Dictionary = lab._review_entry()
+	if absf(lab.item_node.position.x - original.origin.x - 0.01) > 0.0001 or absf(lab.item_node.rotation_degrees.y - 1.0) > 0.01 or not snapshot.has("itemTransform"):
+		push_error("Context item move/rotate/export failed")
+		quit(1)
+		return
+	lab._close_quick_menu()
+	lab._set_mode(0)
+	lab._close_quick_menu()
 	if not lab.hud_nav.visible:
 		push_error("Context menu did not restore transport")
 		quit(1)
