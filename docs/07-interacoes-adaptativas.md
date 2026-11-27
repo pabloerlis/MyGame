@@ -17,3 +17,6 @@ Estado: fontes adquiridas e arquivadas, ainda NÃO ativadas no runtime. Engine a
 
 ## Riscos
 RenIK é port GDScript; compatibilidade 4.4.1 não demonstrada. AMSG é componente de template e requer adaptação. Nenhuma biblioteca identifica semanticamente qualquer objeto sem configuração. Não atualizar engine nem ativar plugins automaticamente nesta aquisição. Não copiar assets ou animações novos. Nenhum teste de execução foi realizado nesta etapa.
+
+## alpha.13 — primeiro adaptador funcional (CI pendente)
+Optado pelo SkeletonIK3D/FABRIK nativo como baseline do Godot 4.4.1, para reduzir risco de API e medir ganho antes de trocar o backend. Mão livre recebe alvo local da peça (marcador explícito ou captura de pose); opção desligada por padrão, por clipe/rig/peça, edição em cm, rejeição por alcance, erro antes/depois e exportação de perfis. A rotação da mão, dedos, colisão fina, janelas de contato e warping não estão resolvidos. RenIK e AMSG continuam arquivados, não ativados. Smoke inclui cadeia sintética; não equivale a aprovação física ou visual do Android.

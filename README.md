@@ -2,7 +2,9 @@
 
 RPG 3D de ação, sobrevivência, exploração e progressão, com identidade própria e estética low-poly de fantasia. PC como plataforma-alvo do jogo final; Android como plataforma exclusiva de testes e entregas da etapa de laboratório; experiência offline; ferramentas e assets gratuitos. O projeto inicia pelo laboratório de validação, não pelo mundo do jogo.
 
-## Estado: 0.1.0-alpha.12 — perfis de equipamento e revisão JSON (CI pendente)
+## Estado: 0.1.0-alpha.13 — mão de apoio com IK experimental (CI pendente)
+
+Primeiro adaptador de contato: ponto de apoio local por equipamento/rig/movimento, captura e ajuste em cm, correção opcional via FABRIK nativo, rejeição de alvo inalcançável e diagnóstico JSON. RenIK e AMSG preservados em `third_party/`, aguardando validação individual; não estão ativos.
 
 Novo modo de inspeção de 130 peças CC0 (106 RPG e 24 armas), com navegação circular e enquadramento automático. O APK mais recente aprovado está na página de Releases.
 

@@ -412,7 +412,7 @@ func _run() -> void:
 	# Programmatic assignment does not guarantee TextEdit.text_changed; mirror explicit UI save.
 	lab._save_reviews()
 	var report: Variant = JSON.parse_string(lab._report_json())
-	if not report is Dictionary or report["reviews"].size() != 1 or report["reviews"][0]["notes"] != "Teste de encaixe: mão esquerda" or report["current"]["notes"] != "Observação atual" or report["build"] != "0.1.0-alpha.12":
+	if not report is Dictionary or report["reviews"].size() != 1 or report["reviews"][0]["notes"] != "Teste de encaixe: mão esquerda" or report["current"]["notes"] != "Observação atual" or report["build"] != "0.1.0-alpha.13" or not report["current"].has("supportIK") or not report.has("supportProfiles"):
 		push_error("Review JSON failed")
 		quit(1)
 		return
@@ -424,4 +424,32 @@ func _run() -> void:
 		return
 	DirAccess.remove_absolute(lab.review_path)
 	print("REVIEW_OK: classification, JSON export and persistent notes.")
+	if not await _test_support_ik():
+		push_error("Support IK synthetic chain failed")
+		quit(1)
+		return
+	print("SUPPORT_IK_OK: reachable target, scale and unreachable rejection.")
 	quit(0)
+
+func _test_support_ik() -> bool:
+	var solver = preload("res://lab/contact_ik.gd").new()
+	var rig := Skeleton3D.new()
+	root.add_child(rig)
+	for bone in ["Root", "LeftUpperArm", "LeftLowerArm", "LeftHand"]:
+		rig.add_bone(bone)
+	for i in range(1, 4):
+		rig.set_bone_parent(i, i - 1)
+		rig.set_bone_rest(i, Transform3D(Basis.IDENTITY, Vector3(0.3, 0, 0) if i > 1 else Vector3.ZERO))
+	rig.reset_bone_poses()
+	var goal := Vector3(0.35, 0.25, 0)
+	solver.apply(rig, 3, goal, 1.0)
+	for i in range(5):
+		await process_frame
+	var ok: bool = solver.state == "active" and solver.after_cm >= 0.0 and solver.after_cm < 3.0 and solver.after_cm < solver.before_cm
+	solver.apply(rig, 3, Vector3(5, 0, 0), 1.0)
+	ok = ok and solver.state == "out_of_reach" and not solver.ik.is_running()
+	ok = ok and solver.reachable(Vector3.ZERO, Vector3(0.3, 0, 0), Vector3(0.6, 0, 0), Vector3(0.4, 0.1, 0))
+	ok = ok and not solver.reachable(Vector3.ZERO, Vector3(0.3, 0, 0), Vector3(0.6, 0, 0), Vector3(0.8, 0, 0))
+	solver.clear()
+	rig.queue_free()
+	return ok

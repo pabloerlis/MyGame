@@ -1,6 +1,16 @@
 extends Node3D
 const Labels = preload("res://lab/labels_pt.gd")
 const EquipmentRules = preload("res://lab/equipment_rules.gd")
+const ContactIK = preload("res://lab/contact_ik.gd")
+var support_solver = ContactIK.new()
+var support_enabled: CheckButton
+var support_status: Label
+var support_axis: OptionButton
+var support_profiles := {}
+var support_path := "user://support-grips-v1.cfg"
+var support_marker: MeshInstance3D
+var support_key := ""
+var support_source := ""
 var category_profiles := {}
 var compatible_only: CheckButton
 var auto_action: CheckButton
@@ -152,6 +162,7 @@ func _ready() -> void:
 	_create_ui()
 	_load_menu_preferences()
 	_load_grip_profiles()
+	_load_support_profiles()
 	_load_reviews()
 	var file := FileAccess.open("res://assets/runtime/catalog.json", FileAccess.READ)
 	if file == null:
@@ -443,6 +454,7 @@ func _create_ui() -> void:
 	equip_size_reset.text = "Restaurar tamanho do equipamento"
 	equipment_controls.add_child(equip_size_reset)
 	equip_size_reset.pressed.connect(_set_equipped_scale.bind(100.0))
+	_create_support_ui(equipment_controls)
 	_section_heading(context_controls, "Objetos de contexto", "Escolha e posicione o objeto junto ao personagem.")
 	context_picker = OptionButton.new()
 	context_picker.fit_to_longest_item = false
@@ -901,6 +913,7 @@ func _refresh_equipped_scale() -> void:
 	equipped_scale_label.text = "Tamanho do equipamento: %.0f%%" % percent
 
 func _load_scene(index: int) -> void:
+	support_solver.clear()
 	_clear_all_equipment()
 	skeleton = null
 	bone_picker.clear()
@@ -1375,6 +1388,7 @@ func _replay() -> void:
 	details.text = "%s | %.2f s | %d trilhas" % [Labels.clip(str(selected_clip), clip_index), animation.length, animation.get_track_count()]
 
 func _process(delta: float) -> void:
+	_update_support()
 	diagnostics_elapsed += delta
 	if diagnostics_elapsed >= 0.10:
 		diagnostics_elapsed = 0.0
@@ -1597,6 +1611,7 @@ func _snapshot() -> Dictionary:
 
 func _review_entry() -> Dictionary:
 	var entry := _snapshot()
+	entry["supportIK"] = _support_snapshot()
 	entry["notes"] = review_notes.text
 	entry["build"] = ProjectSettings.get_setting("application/config/version")
 	entry["itemScale"] = _vjson(_object_scale(item_index))
@@ -1644,7 +1659,7 @@ func _report_json() -> String:
 	for index in object_scales:
 		if int(index) >= 0 and int(index) < items.size():
 			scales[items[int(index)]["id"]] = _vjson(object_scales[index])
-	return JSON.stringify({"schemaVersion": 1, "build": ProjectSettings.get_setting("application/config/version"), "exportedAt": Time.get_datetime_string_from_system(true) + "Z", "current": _review_entry(), "reviews": review_records, "gripProfiles": profiles, "categoryProfiles": categories, "objectScales": scales}, "\t")
+	return JSON.stringify({"schemaVersion": 1, "build": ProjectSettings.get_setting("application/config/version"), "exportedAt": Time.get_datetime_string_from_system(true) + "Z", "current": _review_entry(), "reviews": review_records, "gripProfiles": profiles, "categoryProfiles": categories, "objectScales": scales, "supportProfiles": _support_export_profiles()}, "\t")
 
 func _write_export_file(path: String) -> void:
 	var file := FileAccess.open(path, FileAccess.WRITE)
@@ -1670,3 +1685,177 @@ func _copy_review() -> void:
 	_save_reviews()
 	DisplayServer.clipboard_set(_report_json())
 	review_status.text = "JSON copiado. Cole na conversa."
+
+# A support anchor lives in the scaled equipment's local space, never in
+# the corrected hand. This prevents a feedback loop with BoneAttachment3D.
+func _create_support_ui(parent: VBoxContainer) -> void:
+	_section_heading(parent, "Mão de apoio (experimental)", "Escolha um equipamento em uma mão e deixe a outra livre. Defina o ponto de apoio e compare o movimento.")
+	support_enabled = CheckButton.new()
+	support_enabled.text = "Corrigir mão livre automaticamente"
+	parent.add_child(support_enabled)
+	support_enabled.toggled.connect(func(_enabled): _update_support())
+	var capture := Button.new()
+	capture.text = "Capturar mão livre nesta pose"
+	parent.add_child(capture)
+	capture.pressed.connect(_capture_support)
+	support_axis = OptionButton.new()
+	for axis in ["X local", "Y local", "Z local"]:
+		support_axis.add_item(axis)
+	parent.add_child(support_axis)
+	var row := HBoxContainer.new()
+	parent.add_child(row)
+	for direction in [-1, 1]:
+		var button := Button.new()
+		button.text = "− 1 cm" if direction < 0 else "+ 1 cm"
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(button)
+		button.pressed.connect(_nudge_support.bind(direction))
+	var reset := Button.new()
+	reset.text = "Remover ponto de apoio"
+	parent.add_child(reset)
+	reset.pressed.connect(_reset_support)
+	support_status = Label.new()
+	support_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	parent.add_child(support_status)
+
+func _load_support_profiles() -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load(support_path) != OK:
+		return
+	if cfg.has_section("anchors"):
+		for key in cfg.get_section_keys("anchors"):
+			var p: Variant = cfg.get_value("anchors", key)
+			if p is Vector3 and p.is_finite():
+				support_profiles[key] = p
+
+func _save_support_profiles() -> void:
+	var cfg := ConfigFile.new()
+	for key in support_profiles:
+		cfg.set_value("anchors", key, support_profiles[key])
+	cfg.save(support_path)
+
+func _support_data() -> Dictionary:
+	if item_mode or not is_instance_valid(skeleton) or not is_instance_valid(grip) or not is_instance_valid(attachment):
+		return {}
+	var primary: int = skeleton.find_bone(attachment.bone_name)
+	if primary != int(hand_bones[active_slot]):
+		return {}
+	var other: Dictionary = slot_states.get(1 - active_slot, {})
+	if is_instance_valid(other.get("attachment")):
+		return {}
+	var hand: int = hand_bones[1 - active_slot]
+	if ContactIK.chain(skeleton, hand).size() != 3:
+		return {}
+	var transform := skeleton.global_transform * skeleton.get_bone_global_pose(primary) * grip.transform
+	if not transform.is_finite() or absf(transform.basis.determinant()) < 0.000001:
+		return {}
+	return {"hand": hand, "world": transform, "key": active_profile + "|" + str(selected_clip)}
+
+func _support_anchor(data: Dictionary) -> Variant:
+	support_key = str(data["key"])
+	if support_profiles.has(support_key):
+		support_source = "manual"
+		return support_profiles[support_key]
+	# Only explicit authored marker names; do not invent a grip from a mesh pivot.
+	var markers := grip.find_children("*", "Node3D", true, false)
+	for node in markers:
+		if str(node.name).to_lower() in ["support_grip", "grip_secondary", "secondary_grip", "offhand_grip", "grip_left"]:
+			support_source = "asset_marker_unverified"
+			return grip.to_local(node.global_position)
+	support_source = ""
+	return null
+
+func _capture_support() -> void:
+	var data := _support_data()
+	if data.is_empty():
+		_update_support()
+		return
+	support_solver.suspend("calibration")
+	var hand: int = data["hand"]
+	var world: Transform3D = data["world"]
+	support_profiles[str(data["key"])] = world.affine_inverse() * skeleton.to_global(skeleton.get_bone_global_pose(hand).origin)
+	_save_support_profiles()
+	_update_support()
+
+func _nudge_support(direction: int) -> void:
+	var data := _support_data()
+	if data.is_empty():
+		return
+	var local: Variant = _support_anchor(data)
+	if not local is Vector3:
+		_capture_support()
+		local = _support_anchor(data)
+	if local is Vector3:
+		var point: Vector3 = local
+		point[support_axis.selected] += 0.01 * direction
+		support_profiles[str(data["key"])] = point
+		_save_support_profiles()
+	_update_support()
+
+func _reset_support() -> void:
+	var data := _support_data()
+	if not data.is_empty():
+		support_profiles.erase(str(data["key"]))
+		_save_support_profiles()
+	support_enabled.set_pressed_no_signal(false)
+	_update_support()
+
+func _update_support() -> void:
+	if not is_instance_valid(support_enabled):
+		return
+	var data := _support_data()
+	support_key = ""
+	support_source = ""
+	if data.is_empty():
+		support_solver.suspend("no_free_hand")
+		support_status.text = "Selecione equipamento em uma mão e deixe a outra livre (rig compatível)."
+		_show_support_marker(false)
+		return
+	var local: Variant = _support_anchor(data)
+	if not local is Vector3:
+		support_solver.suspend("no_anchor")
+		support_status.text = "Sem ponto de apoio. Pause na pose desejada, capture a mão e ajuste pelos eixos."
+		_show_support_marker(false)
+		return
+	var world: Transform3D = data["world"]
+	var goal: Vector3 = world * local
+	_show_support_marker(support_enabled.button_pressed, goal)
+	if not support_enabled.button_pressed:
+		support_solver.suspend("disabled")
+		support_status.text = "Ponto registrado. Ative a correção para testar."
+		return
+	support_solver.apply(skeleton, int(data["hand"]), goal, 1.0)
+	if support_solver.state == "out_of_reach":
+		support_status.text = "Alvo fora do alcance: %.1f cm da mão. Correção suspensa." % support_solver.before_cm
+	elif support_solver.state == "active":
+		support_status.text = "IK experimental | erro original %.1f cm | corrigido %s" % [support_solver.before_cm, ("%.1f cm" % support_solver.after_cm) if support_solver.after_cm >= 0.0 else "medindo"]
+	else:
+		support_status.text = "Rig não suportado."
+
+func _show_support_marker(show: bool, goal: Vector3 = Vector3.ZERO) -> void:
+	if not show:
+		if is_instance_valid(support_marker):
+			support_marker.hide()
+		return
+	if not is_instance_valid(support_marker):
+		support_marker = MeshInstance3D.new()
+		var sphere := SphereMesh.new()
+		sphere.radius = 0.018
+		sphere.height = 0.036
+		support_marker.mesh = sphere
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = Color(0.2, 1.0, 0.55)
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		support_marker.material_override = mat
+		add_child(support_marker)
+	support_marker.global_position = goal
+	support_marker.show()
+
+func _support_snapshot() -> Dictionary:
+	return {"enabled": support_enabled.button_pressed, "backend": "godot_fabrik", "state": support_solver.state, "profile": support_key, "source": support_source, "beforeCm": support_solver.before_cm, "afterCm": support_solver.after_cm}
+
+func _support_export_profiles() -> Dictionary:
+	var out := {}
+	for key in support_profiles:
+		out[key] = _vjson(support_profiles[key])
+	return out
