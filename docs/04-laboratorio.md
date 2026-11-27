@@ -5,6 +5,14 @@ O Android em retrato é a plataforma exclusiva de avaliação nesta etapa, não 
 
 Retrato, espaço mínimo por ação, personagem com rosto original, fundo neutro, iluminação simples. Cena 3D ocupa a área principal. Menu recolhível de categorias: personagens, movimentos, equipamentos, objetos, interações e revisão. Busca e seleção imediata; modo loop ou único; no único mostrar botão Play. Controles avançados contextuais: pausa, velocidade, timeline, frame a frame, root motion, esqueleto/colisões. Câmera orbitável 360°, inclinação, pinça/zoom, reset, enquadramento frontal/lateral/traseiro, isométrico e terceira pessoa. Não sobrepor controles à cena; evitar rolagem desnecessária.
 
+## Sala única de testes (escopo obrigatório)
+- Uma única sala física/visual, compacta, com piso neutro, iluminação adequada e limites simples compostos de assets existentes. Sem mapas, corredores, salas temáticas ou decoração dispensável.
+- Ao abrir o APK, entrar diretamente na sala. A mesma câmera e interface permanecem disponíveis em todos os modos. Menus recolhíveis permitem escolher categoria, asset, ação e equipamento; seleção aplica imediatamente, sem navegar para outra sala.
+- Modos na mesma cena: inspeção isolada de qualquer peça; montagem de personagem/equipamentos; reprodução de clipe; interação contextual; combinação de peças estruturais; testes com mais de um ator quando necessário. Objetos entram e saem da área conforme a seleção.
+- Exemplo: selecionar mineração adiciona rocha e picareta; selecionar escalada substitui o contexto por plataforma; selecionar combate instancia alvo; selecionar uma peça permite observar geometria e materiais isoladamente. Tudo no mesmo espaço, sem reconstruir animações ou modelos existentes.
+- Reset deve restaurar posição, orientação, animação e estado físico dos elementos; permitir preservar câmera e escolhas compatíveis. Dimensionar área útil conforme ação, com deslocamento real quando necessário. Não fixar metragem antes de testar os assets.
+- Aceite: trocar de categoria e contexto sem carregar outra sala, sem sobras de props ou colisões, sem perder controles essenciais, sem crescimento contínuo de recursos ativos. Avaliações referenciam contexto e assets, não mapas distintos.
+
 ## Matriz de capacidades
 | Área | Exemplos | Aceite |
 |---|---|---|
