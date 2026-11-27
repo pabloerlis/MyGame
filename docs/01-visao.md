@@ -10,7 +10,7 @@ PC é a plataforma-alvo do RPG final. O laboratório será desenvolvido, distrib
 O projeto investe esforço nas ideias, regras, combinações, integração e experiência de jogo, não em reproduzir material artístico já existente. Reaproveitar ao máximo personagens, criaturas, roupas, armas, cenários, objetos, texturas, animações, efeitos, sons e componentes técnicos gratuitos prontos. Quaternius é a fonte prioritária; fontes adicionais podem preencher lacunas se forem visualmente coerentes, tecnicamente compatíveis e legalmente utilizáveis. Criação visual/animada do zero somente após busca documentada e aprovação explícita. Não restringir o jogo final aos exemplos do primeiro APK.
 
 ## Produto inicial
-Laboratório compacto com personagem original Quaternius, câmera orbital/terceira pessoa, catálogo, movimentos, peças, montagem modular e contextos físicos. A UI prioriza a cena. Cada capacidade validada vira componente reutilizável do futuro jogo.
+Uma única sala de testes compacta e reconfigurável, com personagem original Quaternius, câmera orbital/terceira pessoa, catálogo, movimentos, peças, montagem modular e contextos físicos. Todos os modos de inspeção e interações ocorrem na mesma sala, com troca dinâmica de elementos e sem transição de mapa. A UI prioriza a cena. Cada capacidade validada vira componente reutilizável do futuro jogo.
 
 ## Princípio de aprovação
 Não avançar para construção de mundo sem aprovação explícita do responsável. Toda ação requerida sem recurso disponível será registrada como lacuna; sem inventar cobertura. Aprovação de um clipe em um rig não implica aprovação universal. Versões entregues devem ter mudanças testáveis e notas de versão.
