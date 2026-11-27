@@ -109,6 +109,10 @@ func _run() -> void:
 		push_error("Animation state restoration failed")
 		quit(1)
 		return
+	lab.profile_path = "user://smoke-grips.cfg"
+	if FileAccess.file_exists(lab.profile_path):
+		DirAccess.remove_absolute(lab.profile_path)
+	lab._load_grip_profiles()
 	var equipment_checks := 0
 	for i in range(lab.records.size()):
 		lab._load_scene(i)
@@ -116,6 +120,8 @@ func _run() -> void:
 			push_error("Missing real skeleton or equipment catalog")
 			quit(1)
 			return
+		if lab.bone_picker.selected < 0:
+			lab.bone_picker.select(0)
 		lab.equipment_picker.item_selected.emit(1)
 		if lab.attachment == null or lab.grip == null or lab.attachment.get_parent() != lab.skeleton:
 			push_error("Equipment attachment failed")
@@ -143,14 +149,53 @@ func _run() -> void:
 			push_error("Grip calibration restore failed")
 			quit(1)
 			return
+		var right_attachment: BoneAttachment3D = lab.attachment
+		lab._load_grip_profiles()
+		if not lab.grip_profiles.has(lab.active_profile):
+			push_error("Persisted profile not loaded")
+			quit(1)
+			return
+		lab._switch_slot(1)
+		if lab.bone_picker.selected < 0 or lab.bone_picker.get_selected_id() == selected_bone:
+			for b in range(lab.bone_picker.item_count):
+				if lab.bone_picker.get_item_id(b) != selected_bone:
+					lab.bone_picker.select(b)
+					break
+		lab.equipment_picker.item_selected.emit(2)
+		var left_attachment: BoneAttachment3D = lab.attachment
+		if left_attachment == null or left_attachment == right_attachment or left_attachment.bone_name == right_attachment.bone_name or not is_instance_valid(right_attachment):
+			push_error("Independent slots failed")
+			quit(1)
+			return
+		lab.axis_picker.select(1)
+		lab._adjust_grip(1)
+		lab._switch_slot(0)
+		if lab.attachment != right_attachment or not is_equal_approx(lab.grip.position.x, 0.01) or not is_equal_approx(lab.grip.position.y, 0.0):
+			push_error("Independent slot calibration failed")
+			quit(1)
+			return
+		lab.next_button.pressed.emit()
+		if not is_instance_valid(left_attachment) or not is_instance_valid(right_attachment):
+			push_error("Dual equipment not retained on animation switch")
+			quit(1)
+			return
 		lab._reset_grip()
 		lab.equipment_picker.item_selected.emit(0)
 		if lab.attachment != null:
 			push_error("Equipment removal failed")
 			quit(1)
 			return
+		lab._switch_slot(1)
+		if lab.attachment != left_attachment or not is_equal_approx(lab.grip.position.y, 0.01):
+			push_error("Other slot lost after removal")
+			quit(1)
+			return
+		lab._reset_grip()
+		lab.equipment_picker.item_selected.emit(0)
 		equipment_checks += 1
 		await process_frame
+	DirAccess.remove_absolute(lab.profile_path)
+	print("DUAL_GRIP_OK: ", equipment_checks, " rigs; independent slots and disk round-trip.")
 	print("EQUIPMENT_OK: ", equipment_checks, " rigs; attachment, calibration, playback and removal.")
 	print("ITEMS_OK: ", lab.items.size(), " models; mode switch, navigation and actor restoration.")
 	print("SMOKE_OK: ", packs.size(), " packs; ", count, " imported clip variants.")

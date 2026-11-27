@@ -2,16 +2,16 @@
 
 RPG 3D de ação, sobrevivência, exploração e progressão, com identidade própria e estética low-poly de fantasia. PC como plataforma-alvo do jogo final; Android como plataforma exclusiva de testes e entregas da etapa de laboratório; experiência offline; ferramentas e assets gratuitos. O projeto inicia pelo laboratório de validação, não pelo mundo do jogo.
 
-## Estado: 0.1.0-alpha.5 — equipamento experimental (CI pendente)
+## Estado: 0.1.0-alpha.6 — dois encaixes e persistência (CI pendente)
 
-Novo modo de inspeção de 130 peças CC0 (106 RPG e 24 armas), com navegação circular e enquadramento automático. Último APK validado abaixo: alpha.2.
+Novo modo de inspeção de 130 peças CC0 (106 RPG e 24 armas), com navegação circular e enquadramento automático. Último APK validado abaixo: alpha.4.
 
 Implementados controles permanentes Anterior/Próxima, posição e nome do clipe, navegação circular na cena atual e velocidade de 0,25× a 2×. CI aprovada em 4 cenas, com 172 instâncias de clips; validação física pendente.
 
-Sala única e duas bibliotecas de animação CC0 importadas: quatro cenas GLB e 172 instâncias de clipes. CI aprovada, assinatura verificada e APK Android ARM64 publicado (31,3 MB). Validação visual e execução física no Android ainda pendentes; equipamentos, roupas e catálogo ampliado permanecem no roadmap.
+Sala única e duas bibliotecas de animação CC0 importadas: quatro cenas GLB e 172 instâncias de clipes. CI aprovada, assinatura verificada e APK Android ARM64 publicado (35 MB). Validação visual e execução física no Android ainda pendentes; equipamentos, roupas e catálogo ampliado permanecem no roadmap.
 
-- [Baixar APK experimental](https://github.com/pabloerlis/MyGame/releases/download/lab-alpha-46002174709/MyGame-Lab.apk)
-- [Execução CI aprovada](https://github.com/pabloerlis/MyGame/actions/runs/46002174709)
+- [Baixar APK experimental](https://github.com/pabloerlis/MyGame/releases/download/lab-alpha-46004476412/MyGame-Lab.apk)
+- [Execução CI aprovada](https://github.com/pabloerlis/MyGame/actions/runs/46004476412)
 - [Estado experimental e roteiro de teste físico](docs/06-experimental.md)
 
 ## Documentação

@@ -51,6 +51,12 @@ var equipped_index := -1
 var equipment_indices: Array[int] = []
 var grip_profiles := {}
 var active_profile := ""
+var slot_picker: OptionButton
+var active_slot := 0
+var slot_states := {}
+var hand_bones := [-1, -1]
+var profile_path := "user://grip-profiles-v1.cfg"
+var profile_status := ""
 
 func _ready() -> void:
 	var sun := DirectionalLight3D.new()
@@ -79,6 +85,7 @@ func _ready() -> void:
 	camera.current = true
 	_update_camera()
 	_create_ui()
+	_load_grip_profiles()
 	var file := FileAccess.open("res://assets/runtime/catalog.json", FileAccess.READ)
 	if file == null:
 		status.text = "Assets ausentes. Execute o pipeline de aquisição."
@@ -230,11 +237,16 @@ func _create_ui() -> void:
 	equipment_toggle.pressed.connect(func():
 		equipment_controls.visible = not equipment_controls.visible
 		# Keep the controls in the lower part of the screen.
-		catalog_panel.offset_top = -480 if equipment_controls.visible else -355
+		catalog_panel.offset_top = -520 if equipment_controls.visible else -355
 	)
 	equipment_controls = VBoxContainer.new()
 	equipment_controls.hide()
 	animation_controls.add_child(equipment_controls)
+	slot_picker = OptionButton.new()
+	slot_picker.add_item("Mão direita")
+	slot_picker.add_item("Mão esquerda")
+	equipment_controls.add_child(slot_picker)
+	slot_picker.item_selected.connect(_switch_slot)
 	equipment_picker = OptionButton.new()
 	equipment_picker.fit_to_longest_item = false
 	equipment_picker.add_item("Sem equipamento")
@@ -269,7 +281,7 @@ func _create_ui() -> void:
 	panel.add_child(details)
 
 func _load_scene(index: int) -> void:
-	_clear_equipment()
+	_clear_all_equipment()
 	skeleton = null
 	bone_picker.clear()
 	equipment_picker.select(0)
@@ -342,7 +354,7 @@ func _populate_bones() -> void:
 	# Exact names from the imported skeleton. Prefer hand bones, not fingers.
 	var hands: Array[int] = []
 	var others: Array[int] = []
-	var right_hand := -1
+	hand_bones = [-1, -1]
 	for i in range(skeleton.get_bone_count()):
 		var bone_name := str(skeleton.get_bone_name(i))
 		var normalized := bone_name.to_lower().replace("_", "").replace(".", "").replace(":", "").replace("-", "").replace(" ", "")
@@ -351,16 +363,91 @@ func _populate_bones() -> void:
 		if is_right or is_left:
 			hands.append(i)
 			if is_right:
-				right_hand = i
+				hand_bones[0] = i
+			if is_left:
+				hand_bones[1] = i
 		else:
 			others.append(i)
 	for i in hands + others:
 		bone_picker.add_item(str(skeleton.get_bone_name(i)), i)
-	if right_hand >= 0:
-		bone_picker.select(bone_picker.get_item_index(right_hand))
-	elif bone_picker.item_count > 0:
-		bone_picker.select(0)
+	_select_default_bone()
 	equip_label.text = "Escolha peça e osso. Ajuste a empunhadura."
+
+func _select_default_bone() -> void:
+	var preferred: int = hand_bones[active_slot]
+	if preferred >= 0:
+		bone_picker.select(bone_picker.get_item_index(preferred))
+	else:
+		# No guessed bone when the rig does not expose a recognized hand.
+		bone_picker.select(-1)
+
+func _remember_slot() -> void:
+	slot_states[active_slot] = {
+		"attachment": attachment, "grip": grip, "item": equipped_index,
+		"profile": active_profile, "bone": bone_picker.get_selected_id(),
+		"picker": equipment_picker.selected
+	}
+
+func _switch_slot(index: int) -> void:
+	if index < 0 or index > 1 or index == active_slot:
+		return
+	_remember_slot()
+	active_slot = index
+	slot_picker.select(index)
+	var state: Dictionary = slot_states.get(index, {})
+	attachment = state.get("attachment")
+	grip = state.get("grip")
+	equipped_index = int(state.get("item", -1))
+	active_profile = str(state.get("profile", ""))
+	equipment_picker.select(int(state.get("picker", 0)))
+	var bone_id := int(state.get("bone", -1))
+	if bone_id >= 0 and bone_picker.get_item_index(bone_id) >= 0:
+		bone_picker.select(bone_picker.get_item_index(bone_id))
+	else:
+		_select_default_bone()
+	if is_instance_valid(grip):
+		_update_grip_label()
+	else:
+		equip_label.text = "Sem equipamento neste encaixe"
+
+func _clear_all_equipment() -> void:
+	_remember_slot()
+	for state in slot_states.values():
+		var node: BoneAttachment3D = state.get("attachment")
+		if is_instance_valid(node):
+			node.get_parent().remove_child(node)
+			node.queue_free()
+	slot_states.clear()
+	attachment = null
+	grip = null
+	equipped_index = -1
+	active_profile = ""
+	active_slot = 0
+	slot_picker.select(0)
+
+func _load_grip_profiles() -> void:
+	grip_profiles.clear()
+	var config := ConfigFile.new()
+	var result := config.load(profile_path)
+	if result == ERR_FILE_NOT_FOUND:
+		profile_status = ""
+		return
+	if result != OK:
+		profile_status = " | Falha ao ler ajustes"
+		return
+	for key in config.get_section_keys("grips") if config.has_section("grips") else PackedStringArray():
+		var value: Variant = config.get_value("grips", key)
+		if value is Transform3D and value.is_finite():
+			grip_profiles[key] = value
+	profile_status = ""
+
+func _save_grip_profiles() -> void:
+	var config := ConfigFile.new()
+	config.set_value("meta", "schema", 1)
+	for key in grip_profiles:
+		config.set_value("grips", key, grip_profiles[key])
+	var result := config.save(profile_path)
+	profile_status = " | Salvo" if result == OK else " | Falha ao salvar"
 
 func _clear_equipment() -> void:
 	if is_instance_valid(attachment):
@@ -370,6 +457,7 @@ func _clear_equipment() -> void:
 	grip = null
 	equipped_index = -1
 	active_profile = ""
+	slot_states.erase(active_slot)
 
 func _choose_equipment(index: int) -> void:
 	_clear_equipment()
@@ -383,6 +471,12 @@ func _choose_equipment(index: int) -> void:
 	var record_index: int = equipment_indices[index - 1]
 	var record: Dictionary = items[record_index]
 	var bone_index := bone_picker.get_selected_id()
+	var other: Dictionary = slot_states.get(1 - active_slot, {})
+	var other_attachment: BoneAttachment3D = other.get("attachment")
+	if is_instance_valid(other_attachment) and other_attachment.bone_name == skeleton.get_bone_name(bone_index):
+		equip_label.text = "Este osso já está ocupado pelo outro encaixe"
+		equipment_picker.select(0)
+		return
 	var packed := load(str(record["path"])) as PackedScene
 	if packed == null or bone_index < 0 or bone_index >= skeleton.get_bone_count():
 		equip_label.text = "Falha no carregamento"
@@ -398,7 +492,7 @@ func _choose_equipment(index: int) -> void:
 	attachment.add_child(grip)
 	grip.add_child(model)
 	equipped_index = record_index
-	active_profile = "%s|%s|%s" % [records[scene_picker.selected]["id"], record["id"], attachment.bone_name]
+	active_profile = "%s|%s|%s|%d" % [records[scene_picker.selected]["id"], record["id"], attachment.bone_name, active_slot]
 	if grip_profiles.has(active_profile):
 		grip.transform = grip_profiles[active_profile]
 	_update_grip_label()
@@ -418,17 +512,19 @@ func _adjust_grip(direction: int) -> void:
 		rotation_offset[axis - 3] += 15.0 * direction
 		grip.rotation_degrees = rotation_offset
 	grip_profiles[active_profile] = grip.transform
+	_save_grip_profiles()
 	_update_grip_label()
 
 func _reset_grip() -> void:
 	if is_instance_valid(grip):
 		grip.transform = Transform3D.IDENTITY
 		grip_profiles.erase(active_profile)
+		_save_grip_profiles()
 		_update_grip_label()
 
 func _update_grip_label() -> void:
 	if is_instance_valid(grip):
-		equip_label.text = "%s | P %.2f %.2f %.2f m | R %.0f %.0f %.0f°" % [attachment.bone_name, grip.position.x, grip.position.y, grip.position.z, grip.rotation_degrees.x, grip.rotation_degrees.y, grip.rotation_degrees.z]
+		equip_label.text = "%s | P %.2f %.2f %.2f m | R %.0f %.0f %.0f°" % [attachment.bone_name, grip.position.x, grip.position.y, grip.position.z, grip.rotation_degrees.x, grip.rotation_degrees.y, grip.rotation_degrees.z] + profile_status
 
 func _find_player(node: Node) -> AnimationPlayer:
 	if node is AnimationPlayer:
@@ -476,7 +572,7 @@ func _set_mode(index: int) -> void:
 	mode_picker.select(index)
 	animation_controls.visible = not item_mode
 	item_picker.visible = item_mode
-	catalog_panel.offset_top = -480 if not item_mode and equipment_controls.visible else -355
+	catalog_panel.offset_top = -520 if not item_mode and equipment_controls.visible else -355
 	if item_mode:
 		saved_focus = focus
 		saved_distance = distance
