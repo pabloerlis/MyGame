@@ -22,6 +22,17 @@ var quick_token: LineEdit
 var quick_request: HTTPRequest
 var quick_outbox: Array = []
 var quick_pending_id := ""
+var git_button: Button
+var git_panel: PanelContainer
+var git_context_button: Button
+var git_status: Label
+var git_count: Label
+var git_send_button: Button
+var git_capture_button: Button
+var git_sending := false
+var git_sent_count := 0
+var git_last_status := "Nenhum envio nesta sessão."
+var quick_outbox_path := QUICK_OUTBOX
 const QUICK_OUTBOX := "user://confirmed-feedback-v1.json"
 const VisualPick = preload("res://lab/visual_pick.gd")
 var touch_starts := {}
@@ -361,6 +372,17 @@ func _create_ui() -> void:
 	camera_gesture_button.position = Vector2(12, 160)
 	camera_gesture_button.custom_minimum_size.y = 60
 	camera_gesture_button.pressed.connect(_toggle_camera_gesture)
+	git_button = Button.new()
+	git_button.text = "Enviar para GIT"
+	git_button.add_theme_font_size_override("font_size", 19)
+	git_button.clip_text = true
+	root.add_child(git_button)
+	git_button.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	git_button.offset_left = -235
+	git_button.offset_right = -12
+	git_button.offset_top = 160
+	git_button.offset_bottom = 220
+	git_button.pressed.connect(_open_git_panel)
 	# Persistent transport: independent of the collapsible catalog.
 	var nav := PanelContainer.new()
 	root.add_child(nav)
@@ -682,6 +704,7 @@ func _create_ui() -> void:
 	panel.add_child(details)
 	_create_review_ui(sections[5], root)
 	_create_choice_overlay(root)
+	_create_git_panel(root)
 	_set_menu_transparency(menu_transparency)
 	_touch_sizes(root)
 	_responsive_controls(catalog_panel)
@@ -778,6 +801,7 @@ func _set_settings(open: bool) -> void:
 	catalog_panel.visible = open
 	hud_top.visible = not open
 	camera_gesture_button.visible = not open
+	git_button.visible = not open
 	hud_nav.visible = not open
 	if open:
 		_refresh_sections()
@@ -1734,7 +1758,7 @@ func _update_camera() -> void:
 	camera.look_at(focus)
 
 func _unhandled_input(event: InputEvent) -> void:
-	if settings_open or choice_overlay.visible:
+	if settings_open or choice_overlay.visible or (is_instance_valid(git_panel) and git_panel.visible):
 		return
 	if event is InputEventScreenTouch:
 		if event.pressed:
@@ -1910,18 +1934,10 @@ func _create_review_ui(parent: VBoxContainer, root: Control) -> void:
 	updates.text = "Atualizações do laboratório"
 	parent.add_child(updates)
 	updates.pressed.connect(func(): get_tree().call_group("lab_runtime", "open_update_panel"))
-	var token_hint := Label.new()
-	token_hint.text = "Envio GitHub: token fine-grained do MyGame com Issues: Read and write. Só fica nesta sessão."
-	token_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	parent.add_child(token_hint)
-	quick_token = LineEdit.new()
-	quick_token.secret = true
-	quick_token.placeholder_text = "Token de sessão (opcional)"
-	parent.add_child(quick_token)
 	var send := Button.new()
-	send.text = "Enviar próxima edição confirmada"
+	send.text = "Enviar para GIT"
 	parent.add_child(send)
-	send.pressed.connect(_send_quick_feedback)
+	send.pressed.connect(_open_git_panel)
 	var export := Button.new()
 	export.text = "Exportar JSON"
 	parent.add_child(export)
@@ -2016,7 +2032,7 @@ func _report_json() -> String:
 	for index in object_scales:
 		if int(index) >= 0 and int(index) < items.size():
 			scales[items[int(index)]["id"]] = _vjson(object_scales[index])
-	return JSON.stringify({"schemaVersion": 1, "build": ProjectSettings.get_setting("application/config/version"), "exportedAt": Time.get_datetime_string_from_system(true) + "Z", "current": _review_entry(), "reviews": review_records, "gripProfiles": profiles, "categoryProfiles": categories, "objectScales": scales, "supportProfiles": _support_export_profiles(), "contextContactProfiles": _context_ik_export(), "bodyWarpProfiles": warp_profiles}, "\t")
+	return JSON.stringify({"schemaVersion": 1, "build": ProjectSettings.get_setting("application/config/version"), "exportedAt": Time.get_datetime_string_from_system(true) + "Z", "current": _review_entry(), "reviews": review_records, "gripProfiles": profiles, "categoryProfiles": categories, "objectScales": scales, "supportProfiles": _support_export_profiles(), "contextContactProfiles": _context_ik_export(), "bodyWarpProfiles": warp_profiles, "pendingFeedback": quick_outbox}, "\t")
 
 func _write_export_file(path: String) -> void:
 	var file := FileAccess.open(path, FileAccess.WRITE)
@@ -3130,6 +3146,7 @@ func _create_quick_menu(root: Control) -> void:
 	var actions := HBoxContainer.new()
 	layout.add_child(actions)
 	_quick_button(actions, "Avançado", _open_context_advanced)
+	git_context_button = _quick_button(actions, "Enviar GIT", _open_git_panel)
 	var confirm := _quick_button(actions, "Confirmar", _confirm_quick_feedback)
 	confirm.add_theme_stylebox_override("normal", _flat(Color("#14665e"), 12, 8))
 	quick_status = Label.new()
@@ -3252,7 +3269,7 @@ func _open_target(target: int, slot: int = -1) -> void:
 	quick_page = 0
 	quick_expanded = false
 	_rebuild_quick_controls()
-	quick_status.text = "Confirmar registra · %d pendentes" % quick_outbox.size()
+	quick_status.text = "Confirmar salva localmente · %d pendentes" % quick_outbox.size()
 	hud_nav.hide()
 	quick_panel.show()
 	_choose_quick_dock()
@@ -3679,18 +3696,24 @@ func _quick_scale(target: int, factor: float) -> void:
 	_refresh_quick_readout()
 
 func _load_quick_outbox() -> void:
-	if FileAccess.file_exists(QUICK_OUTBOX):
-		var value: Variant = JSON.parse_string(FileAccess.get_file_as_string(QUICK_OUTBOX))
+	if FileAccess.file_exists(quick_outbox_path):
+		var value: Variant = JSON.parse_string(FileAccess.get_file_as_string(quick_outbox_path))
 		if value is Array:
 			quick_outbox = value
+	_refresh_git_controls()
 
 func _save_quick_outbox() -> bool:
-	var file := FileAccess.open(QUICK_OUTBOX, FileAccess.WRITE)
+	var temp := quick_outbox_path + ".tmp"
+	var file := FileAccess.open(temp, FileAccess.WRITE)
 	if file == null:
 		return false
 	file.store_string(JSON.stringify(quick_outbox))
+	file.flush()
+	var error := file.get_error()
 	file.close()
-	return true
+	if error != OK:
+		return false
+	return DirAccess.rename_absolute(temp, quick_outbox_path) == OK
 
 func _confirm_quick_feedback() -> void:
 	var after := _review_entry()
@@ -3698,57 +3721,177 @@ func _confirm_quick_feedback() -> void:
 	after["notes"] = quick_notes.text
 	after["editTarget"] = quick_target.get_selected_id()
 	after["verdict"] = ["unreviewed", "approved", "needs_adjustment", "incompatible"][maxi(0, quick_verdict.selected)]
-	var id := Crypto.new().generate_random_bytes(16).hex_encode()
-	var entry := {"schemaVersion": 1, "id": id, "before": quick_before.duplicate(true), "after": after}
-	quick_outbox.append(entry)
-	if not _save_quick_outbox():
-		quick_outbox.pop_back()
-		quick_status.text = "Falha ao salvar confirmação."
+	if not _enqueue_feedback(quick_before, after):
 		return
 	quick_before = after.duplicate(true)
 	quick_notes.text = ""
-	quick_draft = true
 	quick_verdict.select(0)
-	quick_status.text = "Confirmado · %d na fila" % quick_outbox.size()
-	if is_instance_valid(quick_token) and not quick_token.text.strip_edges().is_empty():
-		_send_quick_feedback()
-	else:
-		quick_status.text += " Configure o envio em Revisão."
+	# Confirmation is local; only the explicit send action accesses GitHub.
+
+func _enqueue_feedback(before: Dictionary, after: Dictionary) -> bool:
+	var id := Crypto.new().generate_random_bytes(16).hex_encode()
+	var entry := {"schemaVersion": 1, "id": id, "before": before.duplicate(true), "after": after.duplicate(true)}
+	quick_outbox.append(entry)
+	if not _save_quick_outbox():
+		quick_outbox.pop_back()
+		_set_git_status("Falha ao salvar confirmação.")
+		return false
+	_set_git_status("Salvo localmente. Pronto para enviar.")
+	return true
+
+func _create_git_panel(root: Control) -> void:
+	git_panel = PanelContainer.new()
+	root.add_child(git_panel)
+	git_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	git_panel.offset_left = 12
+	git_panel.offset_right = -12
+	git_panel.offset_top = 228
+	git_panel.offset_bottom = 765
+	git_panel.clip_contents = true
+	git_panel.add_theme_stylebox_override("panel", _flat(Color("#17212e"), 18, 12))
+	var layout := VBoxContainer.new()
+	git_panel.add_child(layout)
+	var heading := Label.new()
+	heading.text = "Enviar para GIT"
+	heading.add_theme_font_size_override("font_size", 26)
+	layout.add_child(heading)
+	git_count = Label.new()
+	git_count.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	layout.add_child(git_count)
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	layout.add_child(scroll)
+	var fields := VBoxContainer.new()
+	fields.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(fields)
+	var hint := Label.new()
+	hint.text = "As confirmações serão enviadas como Issues públicas do MyGame. Token fine-grained: somente MyGame, Issues — Read and write. O token fica apenas nesta sessão."
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.add_theme_font_size_override("font_size", 18)
+	fields.add_child(hint)
+	quick_token = LineEdit.new()
+	quick_token.secret = true
+	quick_token.placeholder_text = "Token GitHub (sessão)"
+	fields.add_child(quick_token)
+	var token_help := _quick_button(fields, "Criar token no GitHub", func(): OS.shell_open("https://github.com/settings/personal-access-tokens/new"))
+	token_help.custom_minimum_size.y = 56
+	git_capture_button = _quick_button(fields, "Registrar estado atual", _capture_git_snapshot)
+	git_capture_button.custom_minimum_size.y = 56
+	var backup := _quick_button(fields, "Copiar JSON (backup)", func():
+		DisplayServer.clipboard_set(_report_json())
+		_set_git_status("JSON copiado, incluindo pendências.")
+	)
+	backup.custom_minimum_size.y = 56
+	git_status = Label.new()
+	git_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	git_status.add_theme_font_size_override("font_size", 18)
+	layout.add_child(git_status)
+	git_send_button = _quick_button(layout, "Enviar para GIT", _send_quick_feedback)
+	git_send_button.custom_minimum_size.y = 64
+	git_send_button.add_theme_stylebox_override("normal", _flat(Color("#14665e"), 12, 8))
+	_quick_button(layout, "Voltar", func(): git_panel.hide())
+	_responsive_controls(git_panel)
+	git_panel.hide()
+	_refresh_git_controls()
+
+func _open_git_panel() -> void:
+	touches.clear()
+	touch_starts.clear()
+	git_panel.show()
+	_refresh_git_controls()
+
+func _capture_git_snapshot() -> void:
+	var current := _review_entry()
+	if quick_draft:
+		current["notes"] = quick_notes.text
+		current["editTarget"] = quick_target.get_selected_id()
+		current["verdict"] = ["unreviewed", "approved", "needs_adjustment", "incompatible"][maxi(0, quick_verdict.selected)]
+	# Include the persisted profiles, not just the active preview, for prior local edits.
+	var report: Variant = JSON.parse_string(_report_json())
+	if report is Dictionary:
+		for key in ["gripProfiles", "categoryProfiles", "objectScales", "supportProfiles", "contextContactProfiles", "bodyWarpProfiles"]:
+			current[key] = report.get(key, {})
+	if _enqueue_feedback(quick_before if quick_draft else {}, current):
+		quick_before = current.duplicate(true)
+
+func _set_git_status(value: String) -> void:
+	git_last_status = value
+	_refresh_git_controls()
+
+func _refresh_git_controls() -> void:
+	var count := quick_outbox.size()
+	if is_instance_valid(git_button):
+		git_button.text = "Enviar para GIT" + (" (%d)" % count if count > 0 else "")
+	if is_instance_valid(git_context_button):
+		git_context_button.text = "Enviar GIT" + (" (%d)" % count if count > 0 else "")
+	if is_instance_valid(git_count):
+		git_count.text = "%d pendentes · %d enviados nesta sessão" % [count, git_sent_count]
+	if is_instance_valid(git_status):
+		git_status.text = git_last_status
+	if is_instance_valid(review_status):
+		review_status.text = git_last_status
+	if is_instance_valid(quick_status):
+		quick_status.text = "%d pendentes · %s" % [count, git_last_status]
+	if is_instance_valid(git_send_button):
+		git_send_button.disabled = git_sending or count == 0
+	if is_instance_valid(git_capture_button):
+		git_capture_button.disabled = git_sending
 
 func _send_quick_feedback() -> void:
 	if not quick_pending_id.is_empty():
 		return
 	if quick_outbox.is_empty():
-		review_status.text = "Nenhuma confirmação pendente."
+		git_sending = false
+		_set_git_status("Nenhuma confirmação pendente.")
 		return
 	var token := quick_token.text.strip_edges()
 	if token.is_empty() or token.contains("\n") or token.contains("\r"):
-		review_status.text = "Informe um token válido na sessão."
+		git_sending = false
+		_set_git_status("Informe um token GitHub válido.")
 		return
 	var entry: Dictionary = quick_outbox[0]
-	var body := "Feedback confirmado no MyGame Lab. ID: " + str(entry["id"]) + "\n\n```json\n" + JSON.stringify(entry, "\t") + "\n```"
+	var body := "Feedback confirmado no MyGame Lab. ID: " + str(entry["id"]) + "\n\n```json\n" + JSON.stringify(entry) + "\n```"
 	if body.length() > 60000:
-		review_status.text = "Feedback excede o limite da Issue. Preserve o JSON local."
+		git_sending = false
+		_set_git_status("Registro excede o limite da Issue. Copie o JSON como backup.")
 		return
 	var payload := JSON.stringify({"title": "Lab feedback " + str(entry["id"]), "body": body})
 	quick_pending_id = str(entry["id"])
+	git_sending = true
 	var headers := PackedStringArray(["Authorization: Bearer " + token, "Accept: application/vnd.github+json", "Content-Type: application/json", "X-GitHub-Api-Version: 2022-11-28"])
 	var err := quick_request.request("https://api.github.com/repos/pabloerlis/MyGame/issues", headers, HTTPClient.METHOD_POST, payload)
 	if err != OK:
 		quick_pending_id = ""
-		review_status.text = "Falha de conexão. Confirmação mantida na fila."
+		git_sending = false
+		_set_git_status("Falha de conexão. Registro mantido na fila.")
 	else:
-		review_status.text = "Enviando confirmação…"
+		_set_git_status("Enviando registros ao GitHub…")
 
-func _quick_response(result: int, response_code: int, _headers: PackedStringArray, _body: PackedByteArray) -> void:
+func _quick_response(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
 	if result == HTTPRequest.RESULT_SUCCESS and response_code == 201 and not quick_outbox.is_empty() and str(quick_outbox[0]["id"]) == quick_pending_id:
 		var sent: Variant = quick_outbox.pop_front()
 		if _save_quick_outbox():
-			review_status.text = "Feedback recebido pelo GitHub. Restam %d." % quick_outbox.size()
+			git_sent_count += 1
+			quick_pending_id = ""
+			var issue: Variant = JSON.parse_string(body.get_string_from_utf8())
+			var reference := "Issue #" + str(issue.get("number", "?")) if issue is Dictionary else "Issue criada"
+			if quick_outbox.is_empty():
+				git_sending = false
+				_set_git_status("Enviado ao GitHub · " + reference + " · fila vazia.")
+			else:
+				_set_git_status("Recebido · " + reference + " · enviando próximos…")
+				_send_quick_feedback.call_deferred()
+			return
 		else:
 			quick_outbox.push_front(sent)
-			review_status.text = "GitHub recebeu; falha ao atualizar fila local. Evite reenviar."
+			git_sending = false
+			_set_git_status("GitHub recebeu; falha ao gravar fila. Verifique a Issue antes de reenviar.")
 	else:
-		review_status.text = "Envio não confirmado (HTTP %d). Mantido na fila." % response_code
+		git_sending = false
+		if response_code == 401 or response_code == 403 or response_code == 404:
+			_set_git_status("Acesso negado (HTTP %d). Confira token e permissão Issues. Fila preservada." % response_code)
+		else:
+			_set_git_status("Envio não confirmado (HTTP %d). Fila preservada. Confira Issues antes de tentar novamente." % response_code)
 	quick_pending_id = ""
-	quick_status.text = review_status.text
+

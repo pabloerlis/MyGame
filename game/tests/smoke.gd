@@ -484,6 +484,42 @@ func _run() -> void:
 		push_error("Context item move/rotate/export failed")
 		quit(1)
 		return
+	# Confirmed edits remain local until explicitly sent. No network in this test.
+	lab.quick_outbox_path = "user://smoke-feedback.json"
+	lab.quick_outbox.clear()
+	lab._confirm_quick_feedback()
+	if lab.quick_outbox.size() != 1 or not lab.quick_pending_id.is_empty() or not lab.git_button.text.contains("(1)"):
+		push_error("Local confirmation or GIT count failed")
+		quit(1)
+		return
+	lab.quick_outbox.clear()
+	lab._load_quick_outbox()
+	lab._open_git_panel()
+	if lab.quick_outbox.size() != 1 or not lab.git_panel.visible or lab.git_send_button.disabled:
+		push_error("Feedback queue restoration or GIT panel failed")
+		quit(1)
+		return
+	lab.quick_token.text = ""
+	lab._send_quick_feedback()
+	if lab.quick_outbox.size() != 1 or not lab.git_last_status.contains("token") or not lab.quick_pending_id.is_empty():
+		push_error("Missing token must not lose or send feedback")
+		quit(1)
+		return
+	lab.quick_pending_id = str(lab.quick_outbox[0]["id"])
+	lab._quick_response(HTTPRequest.RESULT_CANT_CONNECT, 0, PackedStringArray(), PackedByteArray())
+	if lab.quick_outbox.size() != 1 or not lab.git_last_status.contains("preservada"):
+		push_error("Unconfirmed transmission must preserve feedback")
+		quit(1)
+		return
+	lab.quick_pending_id = str(lab.quick_outbox[0]["id"])
+	lab._quick_response(HTTPRequest.RESULT_SUCCESS, 201, PackedStringArray(), '{"number":123}'.to_utf8_buffer())
+	if not lab.quick_outbox.is_empty() or lab.git_sent_count != 1 or not lab.git_last_status.contains("#123"):
+		push_error("Confirmed transmission must remove feedback")
+		quit(1)
+		return
+	lab.git_panel.hide()
+	DirAccess.remove_absolute(lab.quick_outbox_path)
+	print("GIT_FEEDBACK_OK: explicit send, persistent queue, token check and simulated HTTP outcomes.")
 	lab._close_quick_menu()
 	lab._set_mode(0)
 	lab._close_quick_menu()
