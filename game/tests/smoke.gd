@@ -408,6 +408,9 @@ func _run() -> void:
 	lab.review_notes.text = "Teste de encaixe: mão esquerda"
 	lab._record_review()
 	lab.review_notes.text = "Observação atual"
+	lab.review_verdict.select(2)
+	# Programmatic assignment does not guarantee TextEdit.text_changed; mirror explicit UI save.
+	lab._save_reviews()
 	var report: Variant = JSON.parse_string(lab._report_json())
 	if not report is Dictionary or report["reviews"].size() != 1 or report["reviews"][0]["notes"] != "Teste de encaixe: mão esquerda" or report["current"]["notes"] != "Observação atual" or report["build"] != "0.1.0-alpha.12":
 		push_error("Review JSON failed")
@@ -415,7 +418,7 @@ func _run() -> void:
 		return
 	lab.review_records.clear()
 	lab._load_reviews()
-	if lab.review_records.size() != 1 or lab.review_notes.text != "Observação atual":
+	if lab.review_records.size() != 1 or lab.review_notes.text != "Observação atual" or lab.review_verdict.selected != 2:
 		push_error("Review persistence failed")
 		quit(1)
 		return

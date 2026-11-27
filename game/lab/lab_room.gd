@@ -565,6 +565,7 @@ func _set_settings(open: bool) -> void:
 	if not open:
 		if was_open:
 			_save_menu_preferences()
+			_save_reviews()
 		_close_choices()
 	touches.clear()
 	catalog_panel.visible = open
@@ -1527,7 +1528,7 @@ func _equip_and_suggest(index: int) -> void:
 	_choose_equipment(index)
 	if auto_action.button_pressed and is_instance_valid(grip) and not _compatible_clip(clip_index):
 		for i in range(clips.size()):
-			if _compatible_clip(i):
+			if EquipmentRules.matches(str(items[equipped_index]["name"]), clips[i]):
 				_select_clip(i)
 				break
 	_refresh_picker_labels()
@@ -1550,6 +1551,8 @@ func _create_review_ui(parent: VBoxContainer, root: Control) -> void:
 	review_notes.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
 	parent.add_child(review_notes)
 	review_notes.text_changed.connect(_save_reviews)
+	review_notes.focus_exited.connect(_save_reviews)
+	review_verdict.item_selected.connect(func(_index): _save_reviews())
 	var add := Button.new()
 	add.text = "Registrar teste atual"
 	parent.add_child(add)
@@ -1595,6 +1598,10 @@ func _snapshot() -> Dictionary:
 func _review_entry() -> Dictionary:
 	var entry := _snapshot()
 	entry["notes"] = review_notes.text
+	entry["build"] = ProjectSettings.get_setting("application/config/version")
+	entry["itemScale"] = _vjson(_object_scale(item_index))
+	entry["contextScale"] = _vjson(_object_scale(context_record_index))
+	entry["contextPosition"] = _vjson(context_root.position) if is_instance_valid(context_root) else []
 	entry["verdict"] = ["unreviewed", "approved", "needs_adjustment", "incompatible"][maxi(0, review_verdict.selected)]
 	entry["reviewedAt"] = Time.get_datetime_string_from_system(true) + "Z"
 	return entry
@@ -1602,6 +1609,7 @@ func _review_entry() -> Dictionary:
 func _record_review() -> void:
 	review_records.append(_review_entry())
 	review_notes.text = ""
+	review_verdict.select(0)
 	_save_reviews()
 
 func _save_reviews() -> void:
@@ -1609,7 +1617,7 @@ func _save_reviews() -> void:
 	if file == null:
 		review_status.text = "Falha ao salvar avaliações."
 		return
-	file.store_string(JSON.stringify({"reviews": review_records, "draft": review_notes.text}))
+	file.store_string(JSON.stringify({"reviews": review_records, "draft": review_notes.text, "draftVerdict": review_verdict.selected}))
 	file.close()
 	review_status.text = "%d testes registrados. Rascunho salvo." % review_records.size()
 
@@ -1622,6 +1630,7 @@ func _load_reviews() -> void:
 		if saved is Array:
 			review_records = saved
 		review_notes.text = str(value.get("draft", ""))
+		review_verdict.select(clampi(int(value.get("draftVerdict", 0)), 0, 3))
 		review_status.text = "%d testes recuperados." % review_records.size()
 
 func _report_json() -> String:
@@ -1647,6 +1656,7 @@ func _write_export_file(path: String) -> void:
 	review_status.text = "JSON exportado: " + path.get_file()
 
 func _export_review() -> void:
+	_save_reviews()
 	export_payload = _report_json()
 	var filename := "MyGame-revisao-" + Time.get_datetime_string_from_system().replace(":", "-") + ".json"
 	var backup := FileAccess.open("user://" + filename, FileAccess.WRITE)
@@ -1657,5 +1667,6 @@ func _export_review() -> void:
 	review_dialog.popup_centered_ratio(0.9)
 
 func _copy_review() -> void:
+	_save_reviews()
 	DisplayServer.clipboard_set(_report_json())
 	review_status.text = "JSON copiado. Cole na conversa."
