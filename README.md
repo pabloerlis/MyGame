@@ -1,6 +1,6 @@
 # MyGame
 
-RPG 3D de ação, sobrevivência, exploração e progressão, com identidade própria e estética low-poly de fantasia. Android primeiro; experiência offline; ferramentas e assets gratuitos. O projeto inicia pelo laboratório de validação, não pelo mundo do jogo.
+RPG 3D de ação, sobrevivência, exploração e progressão, com identidade própria e estética low-poly de fantasia. PC como plataforma-alvo do jogo final; Android como plataforma exclusiva de testes e entregas da etapa de laboratório; experiência offline; ferramentas e assets gratuitos. O projeto inicia pelo laboratório de validação, não pelo mundo do jogo.
 
 ## Estado: 0.0.1 — concepção e documentação
 
@@ -17,7 +17,8 @@ Nenhum APK, asset importado ou benchmark foi produzido nesta etapa. O laboratór
 
 ## Regras permanentes
 
-- Android em orientação vertical no laboratório; Windows fora do escopo inicial.
+- Laboratório e testes do usuário exclusivamente no Android, em orientação vertical, por conveniência durante o dia. O jogo final tem PC como plataforma-alvo.
+- Preservar portabilidade desde o início: núcleo, assets, regras, física e animações compartilhados; separar entrada, UI, armazenamento e perfis gráficos por plataforma. Não compilar nem testar versão PC nesta etapa.
 - Priorizar visualização 3D, menus contextuais e execução imediata da ação selecionada.
 - Incorporar ao repositório público todos os assets gratuitos relevantes legalmente redistribuíveis. Preservar licenças e origem; não publicar material de licença incerta ou restrita.
 - Separar biblioteca de origem, derivados de runtime e catálogo; carregar sob demanda.
