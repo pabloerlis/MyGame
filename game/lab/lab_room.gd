@@ -66,6 +66,14 @@ var context_indices: Array[int] = []
 var context_root: Node3D
 var context_origin := Vector3(0.0, 0.0, -1.2)
 var context_offset := Vector3.ZERO
+var inspection_toggle: Button
+var inspection_controls: VBoxContainer
+var phase_slider: HSlider
+var phase_label: Label
+var contact_picker: OptionButton
+var contact_label: Label
+var diagnostics_elapsed := 0.0
+const CONTACT_TOLERANCE := 0.02
 
 func _ready() -> void:
 	var sun := DirectionalLight3D.new()
@@ -254,6 +262,7 @@ func _create_ui() -> void:
 		equipment_controls.visible = not equipment_controls.visible
 		if equipment_controls.visible:
 			context_controls.hide()
+			inspection_controls.hide()
 		# Keep the controls in the lower part of the screen.
 		catalog_panel.offset_top = -520 if equipment_controls.visible else -355
 	)
@@ -301,6 +310,7 @@ func _create_ui() -> void:
 		context_controls.visible = not context_controls.visible
 		if context_controls.visible:
 			equipment_controls.hide()
+			inspection_controls.hide()
 		catalog_panel.offset_top = -490 if context_controls.visible else -355
 	)
 	context_controls = VBoxContainer.new()
@@ -331,6 +341,45 @@ func _create_ui() -> void:
 	context_label = Label.new()
 	context_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	context_controls.add_child(context_label)
+	inspection_toggle = Button.new()
+	inspection_toggle.text = "Tempo / contato"
+	animation_controls.add_child(inspection_toggle)
+	inspection_toggle.pressed.connect(func():
+		inspection_controls.visible = not inspection_controls.visible
+		if inspection_controls.visible:
+			equipment_controls.hide()
+			context_controls.hide()
+		catalog_panel.offset_top = -520 if inspection_controls.visible else -355
+	)
+	inspection_controls = VBoxContainer.new()
+	inspection_controls.hide()
+	animation_controls.add_child(inspection_controls)
+	phase_label = Label.new()
+	phase_label.text = "Tempo da animação"
+	inspection_controls.add_child(phase_label)
+	phase_slider = HSlider.new()
+	phase_slider.min_value = 0.0
+	phase_slider.max_value = 1.0
+	phase_slider.step = 0.001
+	phase_slider.custom_minimum_size.y = 36
+	inspection_controls.add_child(phase_slider)
+	phase_slider.value_changed.connect(_seek_phase)
+	var frame_row := HBoxContainer.new()
+	inspection_controls.add_child(frame_row)
+	for direction in [-1, 1]:
+		var step_frame := Button.new()
+		step_frame.text = "− 1/60 s" if direction == -1 else "+ 1/60 s"
+		step_frame.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		step_frame.custom_minimum_size.y = 40
+		frame_row.add_child(step_frame)
+		step_frame.pressed.connect(_step_time.bind(direction))
+	contact_picker = OptionButton.new()
+	contact_picker.fit_to_longest_item = false
+	inspection_controls.add_child(contact_picker)
+	contact_picker.item_selected.connect(func(_index): _update_inspection())
+	contact_label = Label.new()
+	contact_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	inspection_controls.add_child(contact_label)
 	details = Label.new()
 	details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	panel.add_child(details)
@@ -404,6 +453,7 @@ func _find_skeleton(node: Node) -> Skeleton3D:
 
 func _populate_bones() -> void:
 	bone_picker.clear()
+	contact_picker.clear()
 	if not is_instance_valid(skeleton):
 		return
 	# Exact names from the imported skeleton. Prefer hand bones, not fingers.
@@ -425,7 +475,12 @@ func _populate_bones() -> void:
 			others.append(i)
 	for i in hands + others:
 		bone_picker.add_item(str(skeleton.get_bone_name(i)), i)
+		contact_picker.add_item(str(skeleton.get_bone_name(i)), i)
 	_select_default_bone()
+	if bone_picker.selected >= 0:
+		contact_picker.select(bone_picker.selected)
+	elif contact_picker.item_count > 0:
+		contact_picker.select(0)
 	equip_label.text = "Escolha peça e osso. Ajuste a empunhadura."
 
 func _select_default_bone() -> void:
@@ -627,7 +682,7 @@ func _set_mode(index: int) -> void:
 	mode_picker.select(index)
 	animation_controls.visible = not item_mode
 	item_picker.visible = item_mode
-	catalog_panel.offset_top = -520 if not item_mode and equipment_controls.visible else (-490 if not item_mode and context_controls.visible else -355)
+	catalog_panel.offset_top = -520 if not item_mode and (equipment_controls.visible or inspection_controls.visible) else (-490 if not item_mode and context_controls.visible else -355)
 	if is_instance_valid(context_root):
 		context_root.visible = not item_mode
 		var body := context_root.get_child(1) as StaticBody3D if context_root.get_child_count() > 1 else null
@@ -778,6 +833,74 @@ func _replay() -> void:
 	player.play(selected_clip)
 	player.seek(0.0, true)
 	details.text = "%s | %.2f s | %d tracks" % [selected_clip, animation.length, animation.get_track_count()]
+
+func _process(delta: float) -> void:
+	diagnostics_elapsed += delta
+	if diagnostics_elapsed >= 0.10:
+		diagnostics_elapsed = 0.0
+		if is_instance_valid(inspection_controls) and inspection_controls.is_visible_in_tree():
+			_update_inspection()
+
+func _clip_length() -> float:
+	if not is_instance_valid(player) or selected_clip == &"":
+		return 0.0
+	var anim := player.get_animation(selected_clip)
+	return anim.length if anim != null else 0.0
+
+func _seek_phase(value: float) -> void:
+	if item_mode or not is_instance_valid(player):
+		return
+	var length := _clip_length()
+	if length <= 0.0:
+		return
+	# Assign the selected clip if one-shot has ended, then stop advancement.
+	if player.assigned_animation != selected_clip:
+		player.play(selected_clip)
+	player.pause()
+	player.seek(clampf(value, 0.0, 1.0) * length, true)
+	_update_inspection()
+
+func _step_time(direction: int) -> void:
+	var length := _clip_length()
+	if length > 0.0 and not item_mode:
+		_seek_phase((player.current_animation_position + float(direction) / 60.0) / length)
+
+func _context_gap(point: Vector3) -> float:
+	if not is_instance_valid(context_root) or context_root.get_child_count() < 2:
+		return INF
+	var body := context_root.get_child(1) as StaticBody3D
+	if body == null or body.get_child_count() == 0:
+		return INF
+	var collision := body.get_child(0) as CollisionShape3D
+	if collision == null or not collision.shape is BoxShape3D:
+		return INF
+	var shape := collision.shape as BoxShape3D
+	var local := collision.to_local(point)
+	var q := local.abs() - shape.size * 0.5
+	# Signed distance: positive outside, negative inside the approximate box.
+	return q.max(Vector3.ZERO).length() + minf(maxf(q.x, maxf(q.y, q.z)), 0.0)
+
+func _update_inspection() -> void:
+	if item_mode or not is_instance_valid(player):
+		return
+	var length := _clip_length()
+	if length > 0.0:
+		var t := clampf(player.current_animation_position, 0.0, length)
+		phase_slider.set_value_no_signal(t / length)
+		phase_label.text = "%.3f / %.3f s | %.1f%%" % [t, length, 100.0 * t / length]
+	if not is_instance_valid(context_root) or not is_instance_valid(skeleton) or contact_picker.selected < 0:
+		contact_label.text = "Selecione um objeto de contexto e um osso."
+		return
+	var bone := contact_picker.get_selected_id()
+	if bone < 0 or bone >= skeleton.get_bone_count():
+		return
+	var point := skeleton.to_global(skeleton.get_bone_global_pose(bone).origin)
+	var gap := _context_gap(point)
+	if not is_finite(gap):
+		contact_label.text = "Colisor indisponível"
+		return
+	var description := "fora" if gap > CONTACT_TOLERANCE else ("dentro" if gap < -CONTACT_TOLERANCE else "próximo")
+	contact_label.text = "%s: %.1f cm (%s) | caixa aproximada" % [skeleton.get_bone_name(bone), gap * 100.0, description]
 
 func _update_camera() -> void:
 	camera.position = focus + Vector3(sin(yaw)*cos(pitch), sin(pitch), cos(yaw)*cos(pitch))*distance

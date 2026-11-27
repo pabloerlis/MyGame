@@ -216,6 +216,33 @@ func _run() -> void:
 		lab._reset_context()
 		await process_frame
 	var previous_context: Node3D = lab.context_root
+	var body: StaticBody3D = lab.context_root.get_child(1)
+	var col: CollisionShape3D = body.get_child(0)
+	var box: BoxShape3D = col.shape
+	var outside: Vector3 = col.to_global(Vector3(box.size.x * 0.5 + 0.1, 0, 0))
+	var surface: Vector3 = col.to_global(Vector3(box.size.x * 0.5, 0, 0))
+	if not is_equal_approx(lab._context_gap(outside), 0.1) or not is_zero_approx(lab._context_gap(surface)) or lab._context_gap(col.global_position) >= 0.0:
+		push_error("Signed context distance failed")
+		quit(1)
+		return
+	lab._select_clip(0)
+	lab._seek_phase(0.5)
+	var length: float = lab._clip_length()
+	if length <= 0.0 or not is_equal_approx(lab.player.current_animation_position, length * 0.5) or lab.player.is_playing():
+		push_error("Phase seek or pause failed")
+		quit(1)
+		return
+	lab._step_time(1)
+	if not is_equal_approx(lab.player.current_animation_position, minf(length, length * 0.5 + 1.0 / 60.0)):
+		push_error("Time step failed")
+		quit(1)
+		return
+	lab._replay()
+	if not lab.player.is_playing():
+		push_error("Replay after seek failed")
+		quit(1)
+		return
+	print("INSPECTION_OK: phase, pause, time step and signed box distance.")
 	lab.next_button.pressed.emit()
 	if lab.context_root != previous_context:
 		push_error("Context lost on clip switch")
