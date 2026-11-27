@@ -20,6 +20,7 @@ Nenhum APK, asset importado ou benchmark foi produzido nesta etapa. O laboratór
 - Laboratório e testes do usuário exclusivamente no Android, em orientação vertical, por conveniência durante o dia. O jogo final tem PC como plataforma-alvo.
 - Preservar portabilidade desde o início: núcleo, assets, regras, física e animações compartilhados; separar entrada, UI, armazenamento e perfis gráficos por plataforma. Não compilar nem testar versão PC nesta etapa.
 - **Reaproveitamento máximo (asset-first):** usar todos os recursos prontos gratuitos, relevantes, compatíveis e legalmente utilizáveis. Não modelar, rigar, texturizar ou animar do zero o que já existe em condições adequadas. Pesquisar alternativas antes de declarar uma lacuna; criação original de recurso visual/animado somente como exceção documentada e autorizada pelo responsável.
+- **Sala única de testes:** todo o laboratório acontece em uma única cena 3D compacta, reconfigurável dinamicamente; trocar assets, ações e contextos sem navegar entre salas ou mapas. Carregar somente os elementos necessários ao teste atual.
 - Priorizar visualização 3D, menus contextuais e execução imediata da ação selecionada.
 - Incorporar ao repositório público todos os assets gratuitos relevantes legalmente redistribuíveis. Preservar licenças e origem; não publicar material de licença incerta ou restrita.
 - Separar biblioteca de origem, derivados de runtime e catálogo; carregar sob demanda.
