@@ -27,6 +27,12 @@ InteractionContext: anchors, dimensões, colisões e affordances (ex.: superfíc
 ReviewRecord: schema_version, build, ids, configuração, fase normalizada, status, notas.
 Separar ActionPlayer (playback), ActionExecutor (movimento/estado), ContactSolver (alinhamento/IK), EquipmentService (sockets/compatibilidade) e Catalog (resolução de dados). UI não implementa física ou regras. Dados dirigem comportamento; scripts específicos só quando necessários.
 
+## Sala única — composição dinâmica
+- Uma cena principal LabRoom persistente com piso/limites modulares prontos, iluminação neutra, câmera orbital e interface sobreposta. Não criar cenas de sala separadas para cada ação; subcenas de assets/contextos são reutilizáveis, instanciadas dentro da sala.
+- LabSession mantém seleção, modo, configuração de câmera e revisão. LabContextManager instancia atores, equipamentos, props e módulos de interação sob demanda em pontos de referência; limpa o contexto anterior, libera recursos e restaura estado físico inicial. Permitir reset manual e repetição determinística do teste.
+- Contextos definem espaço útil, anchors, colisões e dependências (ex.: plataforma de escalada, alvo de combate, peças modulares). A sala pode ajustar área útil ou usar movimento no lugar para locomoção; testes de deslocamento real devem respeitar espaço e colisões.
+- Modos de catálogo, montagem, animação e interação são estados da mesma sala. Inspeção isolada ou combinação simultânea conforme necessidade; não carregar acervo inteiro na memória. O núcleo do jogo não depende de LabRoom.
+
 ## Integração antes de produção artística
 - Usar rigs, malhas, materiais e clips existentes como fonte de verdade. Reutilizar importadores, bibliotecas, addons e recursos nativos gratuitos adequados antes de implementar equivalentes; verificar licença, dependências e portabilidade.
 - Adaptadores por família de rig, bone maps, sockets e perfis de retargeting devem maximizar a cobertura de animações e equipamentos sem remodelar personagens. Compor e mesclar clips existentes; correções de contato e transição via IK/anchors/configuração. Não sintetizar movimentos do zero se houver clipe pronto adequado.
