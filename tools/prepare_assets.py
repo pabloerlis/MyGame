@@ -84,6 +84,48 @@ def prepare(pack):
         records.append({"id": name[:-4], "path": f"res://assets/runtime/{name}", "sourcePath": original, "pack": pack["id"], "sha256": sha, "clips": [a.get("name", str(i)) for i,a in enumerate(meta["animations"])], "license": pack["license"]})
     return records
 
+def prepare_items():
+    """Verified preconverted GLBs from an immutable, CC0 mirror."""
+    lock = json.loads((ROOT / "assets/catalog/items-lock.json").read_text())
+    records = []
+    for pack in lock["packs"]:
+        source = SOURCE / pack["id"]
+        source.mkdir(parents=True, exist_ok=True)
+        (source / "PROVENANCE.json").write_text(json.dumps({
+            "repository": lock["repository"], "revision": lock["revision"],
+            "licenseSource": lock["licenseSource"], "pack": pack
+        }, indent=2) + "\n")
+        for entry in pack["files"]:
+            name = entry["name"]
+            if pathlib.PurePosixPath(name).name != name or not name.endswith(".glb"):
+                raise ValueError("Invalid item name")
+            dest = source / name
+            if dest.exists():
+                data = dest.read_bytes()
+            else:
+                url = f"https://raw.githubusercontent.com/{lock['repository']}/{lock['revision']}/{entry['path']}"
+                with urllib.request.urlopen(url, timeout=60) as response:
+                    data = response.read(entry["bytes"] + 1)
+            blob = hashlib.sha1(f"blob {len(data)}\0".encode() + data).hexdigest()
+            if len(data) != entry["bytes"] or blob != entry["gitBlob"]:
+                raise ValueError(f"Item integrity mismatch: {name}")
+            meta = glb_metadata(data)
+            if not meta.get("meshes"):
+                raise ValueError(f"Item without mesh: {name}")
+            if any("uri" in x and not x["uri"].startswith("data:") for x in meta.get("images", []) + meta.get("buffers", [])):
+                raise ValueError(f"External GLB dependency: {name}")
+            if not dest.exists():
+                dest.write_bytes(data)
+            runtime_name = f"item-{pack['id']}-{name}"
+            (RUNTIME / runtime_name).write_bytes(data)
+            records.append({
+                "id": runtime_name[:-4], "path": f"res://assets/runtime/{runtime_name}",
+                "name": name[:-4], "pack": pack["id"], "license": pack["license"],
+                "sha256": hashlib.sha256(data).hexdigest()
+            })
+    (RUNTIME / "items.json").write_text(json.dumps(records, indent=2) + "\n")
+    print(f"Prepared {len(records)} item models.")
+
 def main():
     RUNTIME.mkdir(parents=True, exist_ok=True)
     for old in RUNTIME.glob("ual*-*.glb"):
@@ -93,6 +135,9 @@ def main():
         records.extend(prepare(pack))
     (RUNTIME / "catalog.json").write_text(json.dumps(records, indent=2) + "\n")
     print(f"Prepared {len(records)} animated scenes; {sum(len(r['clips']) for r in records)} clip instances (variants counted).")
+    for old in RUNTIME.glob("item-*.glb"):
+        old.unlink()
+    prepare_items()
 
 if __name__ == "__main__":
     main()

@@ -76,6 +76,40 @@ func _run() -> void:
 	if packs.size() != 2:
 		quit(1)
 		return
+	if lab.items.size() != 130:
+		push_error("Expected 130 locked RPG and weapon models")
+		quit(1)
+		return
+	var actor_before: Node3D = lab.actor
+	var selected_before: StringName = lab.selected_clip
+	lab.mode_picker.item_selected.emit(1)
+	if not lab.item_mode or lab.actor.visible or lab.item_node == null:
+		push_error("Item mode failed")
+		quit(1)
+		return
+	for i in range(lab.items.size()):
+		lab._load_item(i)
+		if not is_instance_valid(lab.item_node) or lab.item_index != i or lab.item_picker.selected != i:
+			push_error("Item import failed: " + str(i))
+			quit(1)
+			return
+		await process_frame
+	lab.next_button.pressed.emit()
+	if lab.item_index != 0:
+		push_error("Item wrap failed")
+		quit(1)
+		return
+	lab.previous_button.pressed.emit()
+	if lab.item_index != lab.items.size() - 1:
+		push_error("Item reverse wrap failed")
+		quit(1)
+		return
+	lab.mode_picker.item_selected.emit(0)
+	if lab.item_mode or lab.item_node != null or lab.actor != actor_before or not lab.actor.visible or lab.selected_clip != selected_before or not lab.player.is_playing():
+		push_error("Animation state restoration failed")
+		quit(1)
+		return
+	print("ITEMS_OK: ", lab.items.size(), " models; mode switch, navigation and actor restoration.")
 	print("SMOKE_OK: ", packs.size(), " packs; ", count, " imported clip variants.")
 	print("TRANSPORT_OK: ", navigation_checks, " scenes; wrap, sync, visibility, playback mode and speed.")
 	quit(0)

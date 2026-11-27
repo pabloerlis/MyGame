@@ -1,0 +1,802 @@
+{
+  "schemaVersion": 1,
+  "repository": "trebeljahr/quaternius-showcase",
+  "revision": "0128ca510d653bb04d6d1e4885bd8890b5050b4f",
+  "licenseSource": "https://github.com/trebeljahr/quaternius-showcase/blob/0128ca510d653bb04d6d1e4885bd8890b5050b4f/LICENSES.md",
+  "packs": [
+    {
+      "id": "rpg_items_pack",
+      "official": "https://quaternius.com/packs/ultimaterpg.html",
+      "license": "CC0-1.0",
+      "files": [
+        {
+          "name": "Armor_Black.glb",
+          "bytes": 59116,
+          "gitBlob": "8cd52f3073e32f04d4129a97a96230552dcdafe0",
+          "path": "public/glb/rpg_items_pack/Armor_Black.glb"
+        },
+        {
+          "name": "Armor_Golden.glb",
+          "bytes": 58064,
+          "gitBlob": "c06577b4bc47644ccb44ce9fd4ccc4aee96a9b91",
+          "path": "public/glb/rpg_items_pack/Armor_Golden.glb"
+        },
+        {
+          "name": "Armor_Leather.glb",
+          "bytes": 17452,
+          "gitBlob": "4865213b3f452d4d0d6ba1850c29d9c9383e3573",
+          "path": "public/glb/rpg_items_pack/Armor_Leather.glb"
+        },
+        {
+          "name": "Armor_Metal.glb",
+          "bytes": 33440,
+          "gitBlob": "34d3517b14b56fbdc9e71f9bb705f52653f9b61b",
+          "path": "public/glb/rpg_items_pack/Armor_Metal.glb"
+        },
+        {
+          "name": "Armor_Metal2.glb",
+          "bytes": 39920,
+          "gitBlob": "3f33bd769f7d94d9ce43d7e9d72e73b2c7abb942",
+          "path": "public/glb/rpg_items_pack/Armor_Metal2.glb"
+        },
+        {
+          "name": "Arrow.glb",
+          "bytes": 16836,
+          "gitBlob": "7f542fdc1af6dbac55c545a0bf66c6ca77c2d03a",
+          "path": "public/glb/rpg_items_pack/Arrow.glb"
+        },
+        {
+          "name": "Arrow_Golden.glb",
+          "bytes": 14756,
+          "gitBlob": "c903c80d48b5f166f3482ab9974abbb1dc27a7d6",
+          "path": "public/glb/rpg_items_pack/Arrow_Golden.glb"
+        },
+        {
+          "name": "Axe_Double.glb",
+          "bytes": 84232,
+          "gitBlob": "5512547c79d0572f3d4c8cd1255fca892260b45d",
+          "path": "public/glb/rpg_items_pack/Axe_Double.glb"
+        },
+        {
+          "name": "Axe_Double_Golden.glb",
+          "bytes": 84244,
+          "gitBlob": "dffc48530458679e5e29c7fca9589f2f439fc5f6",
+          "path": "public/glb/rpg_items_pack/Axe_Double_Golden.glb"
+        },
+        {
+          "name": "Axe_small.glb",
+          "bytes": 54604,
+          "gitBlob": "391d4b188bc255b862c38b04c024bfb0bbd9c1a2",
+          "path": "public/glb/rpg_items_pack/Axe_small.glb"
+        },
+        {
+          "name": "Axe_small_Golden.glb",
+          "bytes": 54616,
+          "gitBlob": "2b0d785b800680ccc9fec4afc6e290f40f41aff7",
+          "path": "public/glb/rpg_items_pack/Axe_small_Golden.glb"
+        },
+        {
+          "name": "Backpack.glb",
+          "bytes": 217084,
+          "gitBlob": "989c469bf4ee2df683f98d3717405bd7d2b912aa",
+          "path": "public/glb/rpg_items_pack/Backpack.glb"
+        },
+        {
+          "name": "Bag.glb",
+          "bytes": 70352,
+          "gitBlob": "3ba1e20606064e59add6fdaa14c5ad0c4c2d3918",
+          "path": "public/glb/rpg_items_pack/Bag.glb"
+        },
+        {
+          "name": "Bone.glb",
+          "bytes": 17192,
+          "gitBlob": "8ab2cd3fdf1ecaa8285fdc66cde96b7734925b4c",
+          "path": "public/glb/rpg_items_pack/Bone.glb"
+        },
+        {
+          "name": "Book1_Closed.glb",
+          "bytes": 17416,
+          "gitBlob": "175d30d5d5a99e37586de42c4b6f649d8f549a99",
+          "path": "public/glb/rpg_items_pack/Book1_Closed.glb"
+        },
+        {
+          "name": "Book1_Open.glb",
+          "bytes": 25168,
+          "gitBlob": "2dcc875df7b0f5a96fb43c87e2a141f5169e81bd",
+          "path": "public/glb/rpg_items_pack/Book1_Open.glb"
+        },
+        {
+          "name": "Book2_Closed.glb",
+          "bytes": 21344,
+          "gitBlob": "fe013d3b519b7c7ad09e76fb5bd12c5ceca881bb",
+          "path": "public/glb/rpg_items_pack/Book2_Closed.glb"
+        },
+        {
+          "name": "Book2_Open.glb",
+          "bytes": 34976,
+          "gitBlob": "eae95790bb8d6fbc37b2f93a34ac6096469883c5",
+          "path": "public/glb/rpg_items_pack/Book2_Open.glb"
+        },
+        {
+          "name": "Book3_Closed.glb",
+          "bytes": 61620,
+          "gitBlob": "251fac2caf95acc9f342d9c48b9e5bd71a4934de",
+          "path": "public/glb/rpg_items_pack/Book3_Closed.glb"
+        },
+        {
+          "name": "Book3_Open.glb",
+          "bytes": 29044,
+          "gitBlob": "cf0a94f0da1cacb287b91d260c067ff4adad472d",
+          "path": "public/glb/rpg_items_pack/Book3_Open.glb"
+        },
+        {
+          "name": "Book4_Closed.glb",
+          "bytes": 40448,
+          "gitBlob": "1773b70ebef47540d44273f560366e59922c3cea",
+          "path": "public/glb/rpg_items_pack/Book4_Closed.glb"
+        },
+        {
+          "name": "Book4_Open.glb",
+          "bytes": 27080,
+          "gitBlob": "7d1cb6e518acf4803be950888dc1c44833d1549e",
+          "path": "public/glb/rpg_items_pack/Book4_Open.glb"
+        },
+        {
+          "name": "Bow_Golden.glb",
+          "bytes": 45460,
+          "gitBlob": "0f9e35da90d09787b17947913a441a5148a9d6a7",
+          "path": "public/glb/rpg_items_pack/Bow_Golden.glb"
+        },
+        {
+          "name": "Bow_Wooden.glb",
+          "bytes": 39108,
+          "gitBlob": "0de4d56d126278beb4f41a6c8c77ec148197a55b",
+          "path": "public/glb/rpg_items_pack/Bow_Wooden.glb"
+        },
+        {
+          "name": "Chalice.glb",
+          "bytes": 22020,
+          "gitBlob": "f3984ce5481a061e9565e39d32f1d9da3008e893",
+          "path": "public/glb/rpg_items_pack/Chalice.glb"
+        },
+        {
+          "name": "Chest_Closed.glb",
+          "bytes": 96748,
+          "gitBlob": "544e63ca39289d37837dc4c88f7d716e8386511b",
+          "path": "public/glb/rpg_items_pack/Chest_Closed.glb"
+        },
+        {
+          "name": "Chest_Ingots.glb",
+          "bytes": 131208,
+          "gitBlob": "45c0703df9be03e813138a9b9cbbdabd3d5f85c4",
+          "path": "public/glb/rpg_items_pack/Chest_Ingots.glb"
+        },
+        {
+          "name": "Chest_Open.glb",
+          "bytes": 95156,
+          "gitBlob": "4b518fb1ad07c4d4abf0dac68d31a6473b0989ce",
+          "path": "public/glb/rpg_items_pack/Chest_Open.glb"
+        },
+        {
+          "name": "ChickenLeg.glb",
+          "bytes": 18296,
+          "gitBlob": "e6b50a0cecd5359a4c2ee03b838f76e809935138",
+          "path": "public/glb/rpg_items_pack/ChickenLeg.glb"
+        },
+        {
+          "name": "Coin.glb",
+          "bytes": 22304,
+          "gitBlob": "47960d1081c5ed2941de450e63b6332d5122083a",
+          "path": "public/glb/rpg_items_pack/Coin.glb"
+        },
+        {
+          "name": "Coin_Skull.glb",
+          "bytes": 31200,
+          "gitBlob": "28cbf96cc90e03b4c81bc3a8dc1b30c0b854cc26",
+          "path": "public/glb/rpg_items_pack/Coin_Skull.glb"
+        },
+        {
+          "name": "Coin_Star.glb",
+          "bytes": 25292,
+          "gitBlob": "4a9363116f7459cbfda4101b6fd2e46d75b130d1",
+          "path": "public/glb/rpg_items_pack/Coin_Star.glb"
+        },
+        {
+          "name": "Crown.glb",
+          "bytes": 33660,
+          "gitBlob": "37ef28282d7cf20bb3c065c4c782a736544a0353",
+          "path": "public/glb/rpg_items_pack/Crown.glb"
+        },
+        {
+          "name": "Crown2.glb",
+          "bytes": 47620,
+          "gitBlob": "f3c8a0274e006169a16c48be4e251f1c9c895f3e",
+          "path": "public/glb/rpg_items_pack/Crown2.glb"
+        },
+        {
+          "name": "Crystal1.glb",
+          "bytes": 5208,
+          "gitBlob": "2e873bebe1ccecef0c4099f3e9cdde3141abf75c",
+          "path": "public/glb/rpg_items_pack/Crystal1.glb"
+        },
+        {
+          "name": "Crystal1_Damaged.glb",
+          "bytes": 7972,
+          "gitBlob": "49b37fa124cf2872aa6624c43028ee516cdd30af",
+          "path": "public/glb/rpg_items_pack/Crystal1_Damaged.glb"
+        },
+        {
+          "name": "Crystal2.glb",
+          "bytes": 10248,
+          "gitBlob": "e2bb4c16abbfa1d5e241d7f213c15e8730dee655",
+          "path": "public/glb/rpg_items_pack/Crystal2.glb"
+        },
+        {
+          "name": "Crystal2_Damaged.glb",
+          "bytes": 7312,
+          "gitBlob": "40ab36dba7a82c1feeb8dbf765ad7c60b8f92776",
+          "path": "public/glb/rpg_items_pack/Crystal2_Damaged.glb"
+        },
+        {
+          "name": "Crystal3.glb",
+          "bytes": 3084,
+          "gitBlob": "99012b4ba800aa1187185f8b30334e0bb1962cee",
+          "path": "public/glb/rpg_items_pack/Crystal3.glb"
+        },
+        {
+          "name": "Crystal3_Damaged.glb",
+          "bytes": 8988,
+          "gitBlob": "1e35f51367cf086310402822f0ab646c4843eab4",
+          "path": "public/glb/rpg_items_pack/Crystal3_Damaged.glb"
+        },
+        {
+          "name": "Crystal4.glb",
+          "bytes": 4028,
+          "gitBlob": "3abbf4ef2696346c332fdb144c9e37fd5dd3c81e",
+          "path": "public/glb/rpg_items_pack/Crystal4.glb"
+        },
+        {
+          "name": "Crystal5.glb",
+          "bytes": 2968,
+          "gitBlob": "48baea3c38f7e989367da805fdac50b03f9d9cb0",
+          "path": "public/glb/rpg_items_pack/Crystal5.glb"
+        },
+        {
+          "name": "Crystal5_Damaged.glb",
+          "bytes": 6228,
+          "gitBlob": "d98344eb592b8d77e5dc86157d390354647169af",
+          "path": "public/glb/rpg_items_pack/Crystal5_Damaged.glb"
+        },
+        {
+          "name": "Dagger.glb",
+          "bytes": 42808,
+          "gitBlob": "a85368f456710b6ff8fb96d11075b35b016055ea",
+          "path": "public/glb/rpg_items_pack/Dagger.glb"
+        },
+        {
+          "name": "Dagger_Golden.glb",
+          "bytes": 42824,
+          "gitBlob": "e5a44ed8937fa60f349873c588e671b1e071f942",
+          "path": "public/glb/rpg_items_pack/Dagger_Golden.glb"
+        },
+        {
+          "name": "Dart.glb",
+          "bytes": 16836,
+          "gitBlob": "675665d49660ae061bc14ab8de10f524bc4a7265",
+          "path": "public/glb/rpg_items_pack/Dart.glb"
+        },
+        {
+          "name": "Dart_Golden.glb",
+          "bytes": 14752,
+          "gitBlob": "fabee0881651ebb3b67e3099f7500edfb35de40e",
+          "path": "public/glb/rpg_items_pack/Dart_Golden.glb"
+        },
+        {
+          "name": "FishBone.glb",
+          "bytes": 33068,
+          "gitBlob": "58cdfe687860ff380b2a464951daa0d21cdb721b",
+          "path": "public/glb/rpg_items_pack/FishBone.glb"
+        },
+        {
+          "name": "Glove.glb",
+          "bytes": 40796,
+          "gitBlob": "fe9eeed3cd81cb0ca82507f7a8d9338d91a7c881",
+          "path": "public/glb/rpg_items_pack/Glove.glb"
+        },
+        {
+          "name": "Gold_Ingots.glb",
+          "bytes": 36696,
+          "gitBlob": "8e7850dbe2e4bf894f80fc34d607bc82b5a639ad",
+          "path": "public/glb/rpg_items_pack/Gold_Ingots.glb"
+        },
+        {
+          "name": "Hammer_Double.glb",
+          "bytes": 105920,
+          "gitBlob": "8f7b80dea6ac7c02158c44b2d1e723bb9d2955b7",
+          "path": "public/glb/rpg_items_pack/Hammer_Double.glb"
+        },
+        {
+          "name": "Hammer_Double_Golden.glb",
+          "bytes": 105936,
+          "gitBlob": "7c460c330d4db352dd5e85627593b34d6533b919",
+          "path": "public/glb/rpg_items_pack/Hammer_Double_Golden.glb"
+        },
+        {
+          "name": "Heart.glb",
+          "bytes": 32796,
+          "gitBlob": "8ac68f52775ba90b4f18861a52cf97fbec4bda25",
+          "path": "public/glb/rpg_items_pack/Heart.glb"
+        },
+        {
+          "name": "Heart_Broken.glb",
+          "bytes": 37708,
+          "gitBlob": "ce887aa0b310d8220fb21c50e90efabf47fdda75",
+          "path": "public/glb/rpg_items_pack/Heart_Broken.glb"
+        },
+        {
+          "name": "Heart_Half.glb",
+          "bytes": 19676,
+          "gitBlob": "f6e2af665d93e1f7c77a9316672f94eaf40a7588",
+          "path": "public/glb/rpg_items_pack/Heart_Half.glb"
+        },
+        {
+          "name": "Key1.glb",
+          "bytes": 16980,
+          "gitBlob": "1905a2f6321f20d185eb71e532d4f19be8e366c6",
+          "path": "public/glb/rpg_items_pack/Key1.glb"
+        },
+        {
+          "name": "Key2.glb",
+          "bytes": 29200,
+          "gitBlob": "b797a45f02e45a0563a954d84ae666ed8297ad6d",
+          "path": "public/glb/rpg_items_pack/Key2.glb"
+        },
+        {
+          "name": "Key3.glb",
+          "bytes": 41732,
+          "gitBlob": "d1fa8451b1c819bc66f65d2d18bd3e8d3512fec2",
+          "path": "public/glb/rpg_items_pack/Key3.glb"
+        },
+        {
+          "name": "Key4.glb",
+          "bytes": 38800,
+          "gitBlob": "5d343a6f578db2f40d6e97d4f3a338a90dc4ab2d",
+          "path": "public/glb/rpg_items_pack/Key4.glb"
+        },
+        {
+          "name": "Mineral.glb",
+          "bytes": 90384,
+          "gitBlob": "984a545cceb5f23e7ff16999810fb68ce5c07337",
+          "path": "public/glb/rpg_items_pack/Mineral.glb"
+        },
+        {
+          "name": "Necklace1.glb",
+          "bytes": 59736,
+          "gitBlob": "367c69aa9a0deaff9f23cffb7a42c0474d734a08",
+          "path": "public/glb/rpg_items_pack/Necklace1.glb"
+        },
+        {
+          "name": "Necklace2.glb",
+          "bytes": 48516,
+          "gitBlob": "973588e105af5861319df0d9f2f5a7d2b96a246c",
+          "path": "public/glb/rpg_items_pack/Necklace2.glb"
+        },
+        {
+          "name": "Necklace3.glb",
+          "bytes": 61920,
+          "gitBlob": "780d3a109b282f94bd79aa01e5029bbd4b754110",
+          "path": "public/glb/rpg_items_pack/Necklace3.glb"
+        },
+        {
+          "name": "Padlock.glb",
+          "bytes": 33852,
+          "gitBlob": "442fb46b0b755a4dbe793861d684153b935950a0",
+          "path": "public/glb/rpg_items_pack/Padlock.glb"
+        },
+        {
+          "name": "Parchment.glb",
+          "bytes": 33000,
+          "gitBlob": "1bb91579ba389d023b33743c92ebb7bba9221cd3",
+          "path": "public/glb/rpg_items_pack/Parchment.glb"
+        },
+        {
+          "name": "Potion10_Empty.glb",
+          "bytes": 18716,
+          "gitBlob": "397fc8648665a3e0380ff5ee0d9a661a06a49ed3",
+          "path": "public/glb/rpg_items_pack/Potion10_Empty.glb"
+        },
+        {
+          "name": "Potion10_Filled.glb",
+          "bytes": 22044,
+          "gitBlob": "fd824f14d144ecd12b8bd4c5b22ff08a034d6833",
+          "path": "public/glb/rpg_items_pack/Potion10_Filled.glb"
+        },
+        {
+          "name": "Potion11_Empty.glb",
+          "bytes": 22076,
+          "gitBlob": "474254c73130ee371e5e568443183286c64dbbb7",
+          "path": "public/glb/rpg_items_pack/Potion11_Empty.glb"
+        },
+        {
+          "name": "Potion11_Filled.glb",
+          "bytes": 25408,
+          "gitBlob": "60a4abdbc81a3a97ce16aa9c6ba1f7a9a58eca62",
+          "path": "public/glb/rpg_items_pack/Potion11_Filled.glb"
+        },
+        {
+          "name": "Potion1_Empty.glb",
+          "bytes": 32444,
+          "gitBlob": "e0b3510408a4c29f3d05ae03daa8ff5d86b0d747",
+          "path": "public/glb/rpg_items_pack/Potion1_Empty.glb"
+        },
+        {
+          "name": "Potion1_Filled.glb",
+          "bytes": 37360,
+          "gitBlob": "7e2b9676afc0d607e78de0a55c075761ebad75e3",
+          "path": "public/glb/rpg_items_pack/Potion1_Filled.glb"
+        },
+        {
+          "name": "Potion2_Empty.glb",
+          "bytes": 31336,
+          "gitBlob": "10b786fc1fabee5befba4d7ba17babb29b1d80d2",
+          "path": "public/glb/rpg_items_pack/Potion2_Empty.glb"
+        },
+        {
+          "name": "Potion2_Filled.glb",
+          "bytes": 37096,
+          "gitBlob": "1d623f8c95243189891be5eccd74293aaffca042",
+          "path": "public/glb/rpg_items_pack/Potion2_Filled.glb"
+        },
+        {
+          "name": "Potion3_Empty.glb",
+          "bytes": 31340,
+          "gitBlob": "c0c81a602302aa47b2cb83ef9c1db039a78302fe",
+          "path": "public/glb/rpg_items_pack/Potion3_Empty.glb"
+        },
+        {
+          "name": "Potion3_Filled.glb",
+          "bytes": 39980,
+          "gitBlob": "0e9be28d9ad460c93b05b5f9e064c63ca43f2461",
+          "path": "public/glb/rpg_items_pack/Potion3_Filled.glb"
+        },
+        {
+          "name": "Potion4_Empty.glb",
+          "bytes": 31340,
+          "gitBlob": "8757e2ecd03be18627a903f14d567c40a930f118",
+          "path": "public/glb/rpg_items_pack/Potion4_Empty.glb"
+        },
+        {
+          "name": "Potion4_Filled.glb",
+          "bytes": 37676,
+          "gitBlob": "4b7e4388e8ddb3513726fbae5df34f6337034967",
+          "path": "public/glb/rpg_items_pack/Potion4_Filled.glb"
+        },
+        {
+          "name": "Potion5_Empty.glb",
+          "bytes": 35952,
+          "gitBlob": "5e1151aa26f15ee242b518cf7d5f24a219f2eeea",
+          "path": "public/glb/rpg_items_pack/Potion5_Empty.glb"
+        },
+        {
+          "name": "Potion5_Filled.glb",
+          "bytes": 42480,
+          "gitBlob": "3cd105536ef170967ba3cd401a390d4e727c3cdb",
+          "path": "public/glb/rpg_items_pack/Potion5_Filled.glb"
+        },
+        {
+          "name": "Potion6_Empty.glb",
+          "bytes": 45176,
+          "gitBlob": "87afac1b8dc850fdfb0ee3336b5ec9bcb9d5c6fc",
+          "path": "public/glb/rpg_items_pack/Potion6_Empty.glb"
+        },
+        {
+          "name": "Potion6_Filled.glb",
+          "bytes": 56116,
+          "gitBlob": "590e405a1cc2394b22977cabb4883d4baf0e9232",
+          "path": "public/glb/rpg_items_pack/Potion6_Filled.glb"
+        },
+        {
+          "name": "Potion7_Empty.glb",
+          "bytes": 26736,
+          "gitBlob": "bdc70d918b2adac12543dcec77401f1b986f0b8a",
+          "path": "public/glb/rpg_items_pack/Potion7_Empty.glb"
+        },
+        {
+          "name": "Potion7_Filled.glb",
+          "bytes": 34224,
+          "gitBlob": "69d9f27fe9e4afcbcdd31406c83add9b19bf8fdb",
+          "path": "public/glb/rpg_items_pack/Potion7_Filled.glb"
+        },
+        {
+          "name": "Potion8_Empty.glb",
+          "bytes": 26736,
+          "gitBlob": "ee569fdbb92a3a70e481b18cba55aae3e135b24e",
+          "path": "public/glb/rpg_items_pack/Potion8_Empty.glb"
+        },
+        {
+          "name": "Potion8_Filled.glb",
+          "bytes": 34228,
+          "gitBlob": "ec35f244e1585170b87f85c3c2503f8658c28306",
+          "path": "public/glb/rpg_items_pack/Potion8_Filled.glb"
+        },
+        {
+          "name": "Potion9_Empty.glb",
+          "bytes": 29332,
+          "gitBlob": "3b939347e81b1eda1aabfd1c749fd3e5fb8a0290",
+          "path": "public/glb/rpg_items_pack/Potion9_Empty.glb"
+        },
+        {
+          "name": "Potion9_Filled.glb",
+          "bytes": 34124,
+          "gitBlob": "fb6a16677ac051de89bbba6d8000dbcb9001ef59",
+          "path": "public/glb/rpg_items_pack/Potion9_Filled.glb"
+        },
+        {
+          "name": "Pouch.glb",
+          "bytes": 24804,
+          "gitBlob": "42236ef249a065ea1366c755b400649c131a2cd0",
+          "path": "public/glb/rpg_items_pack/Pouch.glb"
+        },
+        {
+          "name": "Ring1.glb",
+          "bytes": 12372,
+          "gitBlob": "c43c20fe20da6b8201e51952370321c49668b74b",
+          "path": "public/glb/rpg_items_pack/Ring1.glb"
+        },
+        {
+          "name": "Ring2.glb",
+          "bytes": 13308,
+          "gitBlob": "8c6dcc3505427746187cd28f69522af7afd3441c",
+          "path": "public/glb/rpg_items_pack/Ring2.glb"
+        },
+        {
+          "name": "Ring3.glb",
+          "bytes": 17364,
+          "gitBlob": "787dcaf92c15bc0b619e938dbaaa305ff37843b8",
+          "path": "public/glb/rpg_items_pack/Ring3.glb"
+        },
+        {
+          "name": "Ring4.glb",
+          "bytes": 30364,
+          "gitBlob": "8d5e8b77b8599de02bd2da65ec06eec9f18239e9",
+          "path": "public/glb/rpg_items_pack/Ring4.glb"
+        },
+        {
+          "name": "Ring5.glb",
+          "bytes": 30500,
+          "gitBlob": "68ed9f05f3c2f0af34b262be9c110d55ba790368",
+          "path": "public/glb/rpg_items_pack/Ring5.glb"
+        },
+        {
+          "name": "Ring6.glb",
+          "bytes": 20304,
+          "gitBlob": "3f2ab8fb137b598d3095ecaca5513b27eca12531",
+          "path": "public/glb/rpg_items_pack/Ring6.glb"
+        },
+        {
+          "name": "Ring7.glb",
+          "bytes": 17324,
+          "gitBlob": "263da28f31e12882654883e3783f112343417233",
+          "path": "public/glb/rpg_items_pack/Ring7.glb"
+        },
+        {
+          "name": "Scroll.glb",
+          "bytes": 54328,
+          "gitBlob": "6791ee1e013807c462f2e632648ab2fc9aeac5af",
+          "path": "public/glb/rpg_items_pack/Scroll.glb"
+        },
+        {
+          "name": "Skull.glb",
+          "bytes": 20408,
+          "gitBlob": "9cde55e1556fb19c7ee76e4886ef8d55ddf1b106",
+          "path": "public/glb/rpg_items_pack/Skull.glb"
+        },
+        {
+          "name": "Skull2.glb",
+          "bytes": 91552,
+          "gitBlob": "0f37ae56907caa56bb17252bdac1c1e76b36e500",
+          "path": "public/glb/rpg_items_pack/Skull2.glb"
+        },
+        {
+          "name": "Snowflake1.glb",
+          "bytes": 37396,
+          "gitBlob": "ef8a807c2dd5f59ccc3933cbf016d952c2d12223",
+          "path": "public/glb/rpg_items_pack/Snowflake1.glb"
+        },
+        {
+          "name": "Snowflake2.glb",
+          "bytes": 22032,
+          "gitBlob": "19731958874bf03da3e3c8eb445b564b9580f1fc",
+          "path": "public/glb/rpg_items_pack/Snowflake2.glb"
+        },
+        {
+          "name": "Snowflake3.glb",
+          "bytes": 82924,
+          "gitBlob": "b38cc0ed2c803c736d3de5fef975d1ae19fdbbbe",
+          "path": "public/glb/rpg_items_pack/Snowflake3.glb"
+        },
+        {
+          "name": "Star.glb",
+          "bytes": 13564,
+          "gitBlob": "476f3416bc8188be82d2e23cdd661102aeb208c1",
+          "path": "public/glb/rpg_items_pack/Star.glb"
+        },
+        {
+          "name": "Sword.glb",
+          "bytes": 47240,
+          "gitBlob": "add0a9400c6f3790b1b1df831467e9803970e199",
+          "path": "public/glb/rpg_items_pack/Sword.glb"
+        },
+        {
+          "name": "Sword_Golden.glb",
+          "bytes": 47252,
+          "gitBlob": "e2f05acff247697158455ed32074c0682a160bd1",
+          "path": "public/glb/rpg_items_pack/Sword_Golden.glb"
+        },
+        {
+          "name": "Sword_big.glb",
+          "bytes": 50036,
+          "gitBlob": "37609dd2aeaadc969673d0cf11c9f2fd27280bf4",
+          "path": "public/glb/rpg_items_pack/Sword_big.glb"
+        },
+        {
+          "name": "Sword_big_Golden.glb",
+          "bytes": 50048,
+          "gitBlob": "e7046ffb4be64852f3d5686d12ed74a03b63c508",
+          "path": "public/glb/rpg_items_pack/Sword_big_Golden.glb"
+        }
+      ]
+    },
+    {
+      "id": "medieval_weapons_pack",
+      "official": "https://quaternius.com/packs/medievalweapons.html",
+      "license": "CC0-1.0",
+      "files": [
+        {
+          "name": "Arrow.glb",
+          "bytes": 16828,
+          "gitBlob": "36cd59c5908a6b0ff890fddc967a3dc38c96ec29",
+          "path": "public/glb/medieval_weapons_pack/Arrow.glb"
+        },
+        {
+          "name": "Axe.glb",
+          "bytes": 63764,
+          "gitBlob": "f3e800ffba303f8f57f0f2511e1aa4026c34558a",
+          "path": "public/glb/medieval_weapons_pack/Axe.glb"
+        },
+        {
+          "name": "Axe_Double.glb",
+          "bytes": 101596,
+          "gitBlob": "ca5c95baa599e2ff59c1b2ade231571d6536a05f",
+          "path": "public/glb/medieval_weapons_pack/Axe_Double.glb"
+        },
+        {
+          "name": "Axe_Small.glb",
+          "bytes": 54740,
+          "gitBlob": "da2ae71651f7a21828b76d63e000c0455ca7e679",
+          "path": "public/glb/medieval_weapons_pack/Axe_Small.glb"
+        },
+        {
+          "name": "Bow_Evil.glb",
+          "bytes": 44556,
+          "gitBlob": "625b6932b09ed1ad1c6395474c92a5bcef023538",
+          "path": "public/glb/medieval_weapons_pack/Bow_Evil.glb"
+        },
+        {
+          "name": "Bow_Golden.glb",
+          "bytes": 45448,
+          "gitBlob": "5a1f9dea8ee895006ef4e2493c09bdeb3cd0c61a",
+          "path": "public/glb/medieval_weapons_pack/Bow_Golden.glb"
+        },
+        {
+          "name": "Bow_Wooden.glb",
+          "bytes": 42668,
+          "gitBlob": "ed8ba33364cdd631dc3b615c033867ccc144d5be",
+          "path": "public/glb/medieval_weapons_pack/Bow_Wooden.glb"
+        },
+        {
+          "name": "Bow_Wooden2.glb",
+          "bytes": 39308,
+          "gitBlob": "0a8bc695eeb35fb10754b24d3b529cc48a3ffc35",
+          "path": "public/glb/medieval_weapons_pack/Bow_Wooden2.glb"
+        },
+        {
+          "name": "Claymore.glb",
+          "bytes": 54980,
+          "gitBlob": "7e2bc34db535a5983012c09930a1ffd3b1cce720",
+          "path": "public/glb/medieval_weapons_pack/Claymore.glb"
+        },
+        {
+          "name": "Dagger.glb",
+          "bytes": 43740,
+          "gitBlob": "2d2f3ff09a4c97879384f81ce03bd83ac068ed7c",
+          "path": "public/glb/medieval_weapons_pack/Dagger.glb"
+        },
+        {
+          "name": "Dagger_2.glb",
+          "bytes": 40368,
+          "gitBlob": "bfa7f2fed8e3d3be18d7a5d6b7342a7fd3db2af1",
+          "path": "public/glb/medieval_weapons_pack/Dagger_2.glb"
+        },
+        {
+          "name": "Hammer_Double.glb",
+          "bytes": 105748,
+          "gitBlob": "7b3f80d837776c7fd33fa99c6dec6229afc67f74",
+          "path": "public/glb/medieval_weapons_pack/Hammer_Double.glb"
+        },
+        {
+          "name": "Hammer_Small.glb",
+          "bytes": 82540,
+          "gitBlob": "9b6d6ebc4b9b98fc70c48c81c1478614d1e98c0a",
+          "path": "public/glb/medieval_weapons_pack/Hammer_Small.glb"
+        },
+        {
+          "name": "Scythe.glb",
+          "bytes": 75252,
+          "gitBlob": "be496056bbaaf22576ef77121bcd1402d8d8baa5",
+          "path": "public/glb/medieval_weapons_pack/Scythe.glb"
+        },
+        {
+          "name": "Shield_Celtic_Golden.glb",
+          "bytes": 47584,
+          "gitBlob": "e8f8bb1e1103bff4377bb2032f6e68f69176d3d2",
+          "path": "public/glb/medieval_weapons_pack/Shield_Celtic_Golden.glb"
+        },
+        {
+          "name": "Shield_Heater.glb",
+          "bytes": 97820,
+          "gitBlob": "da6627ef6a41898013b944f330a30f413eb8985a",
+          "path": "public/glb/medieval_weapons_pack/Shield_Heater.glb"
+        },
+        {
+          "name": "Shield_Heater_2.glb",
+          "bytes": 63424,
+          "gitBlob": "3a46607aa4d38044cfb453ebc7d26bb01df3a65c",
+          "path": "public/glb/medieval_weapons_pack/Shield_Heater_2.glb"
+        },
+        {
+          "name": "Shield_Round.glb",
+          "bytes": 60448,
+          "gitBlob": "1b2884b6a6ada7a4519d58accf9d7bc720ef5c54",
+          "path": "public/glb/medieval_weapons_pack/Shield_Round.glb"
+        },
+        {
+          "name": "Shield_Round_2.glb",
+          "bytes": 69492,
+          "gitBlob": "178a5aa7e51d086e0f57c589982ff11e4783ef5c",
+          "path": "public/glb/medieval_weapons_pack/Shield_Round_2.glb"
+        },
+        {
+          "name": "Spear.glb",
+          "bytes": 69892,
+          "gitBlob": "32453de78544e74b4461b25482cd86b3252970ae",
+          "path": "public/glb/medieval_weapons_pack/Spear.glb"
+        },
+        {
+          "name": "Sword.glb",
+          "bytes": 48384,
+          "gitBlob": "d79773820a686fd56c9c76eb38aeca2706adcb75",
+          "path": "public/glb/medieval_weapons_pack/Sword.glb"
+        },
+        {
+          "name": "Sword_2.glb",
+          "bytes": 54156,
+          "gitBlob": "a291d99aff3ec173fa1ae4cca2e29607ee259aa2",
+          "path": "public/glb/medieval_weapons_pack/Sword_2.glb"
+        },
+        {
+          "name": "Sword_Big.glb",
+          "bytes": 50336,
+          "gitBlob": "5485c518b599d6ef0cc8dea6a02e3cadca9849d2",
+          "path": "public/glb/medieval_weapons_pack/Sword_Big.glb"
+        },
+        {
+          "name": "Sword_Golden.glb",
+          "bytes": 58220,
+          "gitBlob": "283303c890ba2d081ecd9cc01cef541b541572b3",
+          "path": "public/glb/medieval_weapons_pack/Sword_Golden.glb"
+        }
+      ]
+    }
+  ]
+}

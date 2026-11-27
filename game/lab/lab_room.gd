@@ -27,6 +27,17 @@ var catalog_panel: PanelContainer
 var speed_picker: OptionButton
 const SPEEDS := [0.25, 0.5, 1.0, 1.5, 2.0]
 var playback_speed := 1.0
+var items: Array = []
+var item_mode := false
+var item_index := -1
+var item_node: Node3D
+var mode_picker: OptionButton
+var item_picker: OptionButton
+var animation_controls: VBoxContainer
+var saved_focus := Vector3(0, 1, 0)
+var saved_distance := 4.0
+var item_focus := Vector3(0, 1, 0)
+var item_distance := 4.0
 
 func _ready() -> void:
 	var sun := DirectionalLight3D.new()
@@ -67,6 +78,14 @@ func _ready() -> void:
 	for record in records:
 		scene_picker.add_item(str(record["pack"]) + " | " + str(record["sourcePath"]).get_file())
 	_load_scene(0)
+	var item_file := FileAccess.open("res://assets/runtime/items.json", FileAccess.READ)
+	if item_file != null:
+		var parsed_items: Variant = JSON.parse_string(item_file.get_as_text())
+		if parsed_items is Array:
+			items = parsed_items
+	for item in items:
+		item_picker.add_item(str(item["name"]) + " | " + ("RPG" if item["pack"] == "rpg_items_pack" else "Armas"))
+	mode_picker.set_item_disabled(1, items.is_empty())
 
 func _create_ui() -> void:
 	var layer := CanvasLayer.new()
@@ -94,7 +113,8 @@ func _create_ui() -> void:
 	reset.pressed.connect(func():
 		yaw = 0.65
 		pitch = 0.24
-		distance = 4.0
+		focus = item_focus if item_mode else Vector3(0, 1, 0)
+		distance = item_distance if item_mode else 4.0
 		_update_camera()
 	)
 	# Persistent transport: independent of the collapsible catalog.
@@ -133,21 +153,34 @@ func _create_ui() -> void:
 	bottom.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	bottom.offset_left = 12
 	bottom.offset_right = -12
-	bottom.offset_top = -300
+	bottom.offset_top = -355
 	bottom.offset_bottom = -94
 	panel = VBoxContainer.new()
 	bottom.add_child(panel)
 	toggle.pressed.connect(func(): bottom.visible = not bottom.visible)
+	mode_picker = OptionButton.new()
+	mode_picker.add_item("Personagens e animações")
+	mode_picker.add_item("Inspecionar peças")
+	mode_picker.set_item_disabled(1, true)
+	panel.add_child(mode_picker)
+	mode_picker.item_selected.connect(_set_mode)
+	item_picker = OptionButton.new()
+	item_picker.fit_to_longest_item = false
+	item_picker.hide()
+	panel.add_child(item_picker)
+	item_picker.item_selected.connect(_load_item)
+	animation_controls = VBoxContainer.new()
+	panel.add_child(animation_controls)
 	scene_picker = OptionButton.new()
 	scene_picker.fit_to_longest_item = false
-	panel.add_child(scene_picker)
+	animation_controls.add_child(scene_picker)
 	scene_picker.item_selected.connect(_load_scene)
 	clip_picker = OptionButton.new()
 	clip_picker.fit_to_longest_item = false
-	panel.add_child(clip_picker)
+	animation_controls.add_child(clip_picker)
 	clip_picker.item_selected.connect(_select_clip)
 	var row := HBoxContainer.new()
-	panel.add_child(row)
+	animation_controls.add_child(row)
 	loop_toggle = CheckButton.new()
 	loop_toggle.text = "Loop"
 	loop_toggle.button_pressed = true
@@ -169,7 +202,7 @@ func _create_ui() -> void:
 	for value in SPEEDS:
 		speed_picker.add_item("Velocidade %s×" % str(value))
 	speed_picker.select(2)
-	panel.add_child(speed_picker)
+	animation_controls.add_child(speed_picker)
 	speed_picker.item_selected.connect(_set_speed)
 	details = Label.new()
 	details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -245,15 +278,100 @@ func _select_clip(index: int) -> void:
 	_replay()
 
 func _step_clip(direction: int) -> void:
+	if item_mode:
+		if not items.is_empty():
+			_load_item(posmod(item_index + direction, items.size()))
+		return
 	if clips.is_empty() or not is_instance_valid(player):
 		return
 	_select_clip(posmod(clip_index + direction, clips.size()))
 
 func _update_transport() -> void:
+	if item_mode:
+		previous_button.disabled = items.size() < 2
+		next_button.disabled = items.size() < 2
+		clip_caption.text = "%d/%d\n%s" % [item_index + 1, items.size(), items[item_index]["name"]] if item_index >= 0 else "—"
+		return
 	var available := clip_index >= 0 and clip_index < clips.size()
 	previous_button.disabled = not available or clips.size() < 2
 	next_button.disabled = not available or clips.size() < 2
 	clip_caption.text = "%d/%d\n%s" % [clip_index + 1, clips.size(), selected_clip] if available else "—"
+
+func _set_mode(index: int) -> void:
+	var new_mode := index == 1
+	if new_mode == item_mode or (new_mode and items.is_empty()):
+		return
+	item_mode = new_mode
+	mode_picker.select(index)
+	animation_controls.visible = not item_mode
+	item_picker.visible = item_mode
+	if item_mode:
+		saved_focus = focus
+		saved_distance = distance
+		if is_instance_valid(player):
+			player.pause()
+		if is_instance_valid(actor):
+			actor.hide()
+		_load_item(maxi(item_index, 0))
+	else:
+		_clear_item()
+		focus = saved_focus
+		distance = saved_distance
+		if is_instance_valid(actor):
+			actor.show()
+		status.text = "%s movimentos" % clips.size()
+		_update_camera()
+		_update_transport()
+		_replay()
+
+func _clear_item() -> void:
+	if is_instance_valid(item_node):
+		remove_child(item_node)
+		item_node.queue_free()
+	item_node = null
+
+func _load_item(index: int) -> void:
+	if not item_mode or index < 0 or index >= items.size():
+		return
+	var record: Dictionary = items[index]
+	var packed := load(str(record["path"])) as PackedScene
+	if packed == null:
+		status.text = "Falha ao importar peça"
+		return
+	var node := packed.instantiate()
+	if not node is Node3D:
+		node.free()
+		return
+	_clear_item()
+	item_node = node as Node3D
+	add_child(item_node)
+	item_index = index
+	item_picker.select(index)
+	var boxes: Array[AABB] = []
+	_collect_bounds(item_node, boxes)
+	if not boxes.is_empty():
+		var bounds: AABB = boxes[0]
+		for i in range(1, boxes.size()):
+			bounds = bounds.merge(boxes[i])
+		# Translate to a neutral inspection position, without rescaling the model.
+		item_node.position += Vector3(-bounds.get_center().x, 0.12 - bounds.position.y, -bounds.get_center().z)
+		item_focus = Vector3(0, 0.12 + bounds.size.y * 0.5, 0)
+		item_distance = clampf(bounds.size.length() * 2.0, 0.25, 12.0)
+	else:
+		item_focus = Vector3(0, 1, 0)
+		item_distance = 4.0
+	focus = item_focus
+	distance = item_distance
+	status.text = "%d peças" % items.size()
+	details.text = str(record["name"]) + " | " + str(record["pack"]) + " | CC0"
+	_update_camera()
+	_update_transport()
+
+func _collect_bounds(node: Node, boxes: Array[AABB]) -> void:
+	if node is MeshInstance3D and node.mesh != null:
+		boxes.append(node.global_transform * node.get_aabb())
+	for child in node.get_children():
+		_collect_bounds(child, boxes)
 
 func _set_speed(index: int) -> void:
 	if index < 0 or index >= SPEEDS.size():
@@ -295,7 +413,7 @@ func _unhandled_input(event: InputEvent) -> void:
 					var before := previous.distance_to(other)
 					var after: float = event.position.distance_to(other)
 					if before > 1.0 and after > 1.0:
-						distance = clampf(distance * before / after, 1.5, 12.0)
+						distance = clampf(distance * before / after, 0.15 if item_mode else 1.5, 12.0)
 		else:
 			yaw -= event.relative.x * 0.006
 			pitch = clampf(pitch + event.relative.y * 0.006, -0.15, 1.2)

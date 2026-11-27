@@ -28,3 +28,6 @@ Implementado: faixa inferior permanente com botões Anterior/Próxima, posição
 
 
 CI alpha.2 confirmada: [run 46002174709](https://github.com/pabloerlis/MyGame/actions/runs/46002174709), SMOKE_OK (2 packs, 172 variantes) e TRANSPORT_OK (4 cenas, navegação circular, sincronização, visibilidade, modo e velocidade). APK assinado de 31.294.654 bytes, [download](https://github.com/pabloerlis/MyGame/releases/download/lab-alpha-46002174709/MyGame-Lab.apk). SHA-256: 04ae7b909033a30d2424a64984ae51d0a69b68a3a920a0fc07add8aea6299270. Teste físico pendente; aviso de ausência de ícone permanece. Chave de debug não persistente pode exigir desinstalação da versão anterior.
+
+## 0.1.0-alpha.3 — inspeção de peças
+Acervo bloqueado por commit e hash Git de cada GLB: 106 modelos Ultimate RPG Pack e 24 Modular Weapons Pack (5.573.380 bytes de origem), CC0 conforme páginas oficiais. GLBs convertidos por trebeljahr/quaternius-showcase, não arquivos FBX/Blend originais. CI verifica integridade, retém GLBs no repositório e importa todos os modelos. Modo Peças na mesma sala, navegação circular pelas setas, enquadramento automático por limites sem alterar escala e restauração do ator/animação ao voltar. Inspeção isolada, não equipagem, colisão ou interação ainda. Teste físico e CI pendentes.
