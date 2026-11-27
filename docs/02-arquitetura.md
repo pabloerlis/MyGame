@@ -1,7 +1,7 @@
 # Arquitetura — ADR-001 (proposta inicial)
 
 ## Decisão
-Godot 4.x estável + GDScript tipado, exportação Android ARM64, glTF/GLB preferencial; começar com renderer Compatibility (OpenGL ES 3), comparar Mobile/Vulkan em hardware real. Fixar versão exata do editor, templates, SDK e JDK 17 no primeiro spike. Não introduzir plugins pagos. Blender somente para conversão/inspeção reproduzível quando necessário.
+Godot 4.x estável + GDScript tipado, núcleo portátil para PC (plataforma final) e exportação Android ARM64 exclusiva na etapa inicial, glTF/GLB preferencial; começar com renderer Compatibility (OpenGL ES 3), comparar Mobile/Vulkan em hardware real. Fixar versão exata do editor, templates, SDK e JDK 17 no primeiro spike. Não introduzir plugins pagos. Blender somente para conversão/inspeção reproduzível quando necessário.
 
 | Alternativa | Vantagem | Custo/risco |
 |---|---|---|
@@ -29,6 +29,16 @@ Separar ActionPlayer (playback), ActionExecutor (movimento/estado), ContactSolve
 
 ## Pipeline
 Originais imutáveis → inventário/licença → validação de malhas, materiais, rig e escala → normalização em metros → perfil de retargeting por família → derivados GLB/recursos Godot → catálogo → carregamento sob demanda. Usar Skeleton3D, BoneAttachment3D e AnimationPlayer/AnimationTree quando adequado. Aplicar correções por perfil, não sobrescrever clips. Não misturar root motion com deslocamento duplicado de CharacterBody3D. Testar colisões em runtime, não inferir qualidade só por importação.
+
+## Portabilidade Android → PC (requisito obrigatório)
+- Um projeto Godot, um núcleo e uma fonte de verdade para cenas, assets, rigs, regras, colisões e dados. Não bifurcar a implementação por plataforma.
+- Comandos semânticos (selecionar ação, mover, mirar, interagir, equipar, orbitar, zoom) independentes de touchscreen, teclado, mouse ou gamepad. InputMap e adaptadores traduzem dispositivos para comandos; ações não leem eventos físicos diretamente.
+- Laboratório em retrato com UI de toque; cenas 3D e serviços não dependem de layout, orientação, resolução ou DPI. Preparar separação de UI desktop futura sem implementar essa UI agora.
+- Simulação em passo fixo de física; animação por tempo, não por quantidade de frames; unidades em metros e coordenadas de mundo independentes de pixels.
+- Persistência via user://, caminhos relativos res:// e adaptadores para seletor/exportação de arquivos. JSON versionado e IDs estáveis preservados entre plataformas. Nenhum caminho absoluto, JNI ou plugin Android no núcleo.
+- Assets glTF/GLB compartilhados, materiais portáveis; qualidade de sombras, texturas, LOD, resolução e limites por perfil. Compatibility inicial não determina renderer final do PC; eventual Forward+ exige validação própria.
+- Dependências nativas somente se indispensáveis e com alternativa desktop. Preferir APIs multiplataforma da engine. CI Android e testes headless do núcleo nesta fase; sem build Windows/Linux/macOS até etapa posterior. Testar no Android não comprova desempenho nem compatibilidade gráfica no PC.
+- Gate de portabilidade futuro: exportar a mesma base para PC, mapear teclado/mouse e eventualmente gamepad, ajustar UI desktop e perfis gráficos, validar paridade de comportamento e medir desempenho sem reescrever sistemas centrais. Sistema operacional e requisitos de hardware do PC ainda não definidos.
 
 ## Performance e portabilidade
 Cache limitado e descarregamento, materiais compartilhados, texturas comprimidas após comparação visual; não duplicar formatos no APK. APK inicial contém amostra representativa; expansão offline por pacotes legalmente distribuíveis caso necessário. Tamanho máximo ainda não definido: medir primeiro. CI headless importa e testa lógica, mas não substitui GPU/dispositivo real.
