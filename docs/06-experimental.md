@@ -7,3 +7,18 @@ Limitação: ambiente de autoria sem DNS externo nem Godot instalado. Nenhum APK
 
 ## Primeira execução CI (run 45993715871)
 Aquisição e SHA-256 confirmados: os dois ZIPs Standard foram publicados em assets/source/cc0 no commit 72dda18. O pipeline extraiu 4 cenas GLB animadas e 172 instâncias de clips (variantes incluídas, não quantidade de movimentos únicos). Godot e templates foram instalados com sucesso. Build interrompido em sdkmanager ausente, antes da importação da engine. Corrigido workflow para instalar explicitamente ferramentas Android, aceitar licenças SDK e verificar códigos de saída de importação/exportação. Nova execução ainda precisa ser confirmada. Sem APK validado nesta execução.
+
+## Baseline publicada — 27/11/2026
+
+Run [45996718841](https://github.com/pabloerlis/MyGame/actions/runs/45996718841), código f38af05ca501240c09126342790c22287e3740d1: importação real via OpenGL por software, smoke test (SMOKE_OK: 2 packs; 172 imported clip variants), exportação Android ARM64, verificação de assinatura e publicação concluídos. APK 31.290.558 bytes (31,3 MB), SHA-256 b04f9de34a6710819f6ae8c68c3167c7b97b0fd65b1a1928e6a8d9f19a0e6698. [Download direto](https://github.com/pabloerlis/MyGame/releases/download/lab-alpha-45996718841/MyGame-Lab.apk).
+
+Limites: smoke test em Linux valida importação e seleção de clips, não renderização visual nem execução no Android. A exportação registrou ausência de ícone próprio sem impedir o APK; corrigir usando recurso pronto licenciado quando pertinente. A CI gera chave de debug nova, portanto atualização sobre instalação anterior pode exigir desinstalação. Não há medição de FPS, RAM ou temperatura em aparelho. A aprovação do laboratório continua pendente.
+
+### Roteiro do primeiro teste físico
+
+- Abrir em retrato e verificar personagem, textura e iluminação.
+- Trocar cenas e movimentos, verificar reprodução imediata, loop, reprodução única e pausa.
+- Girar câmera com um dedo, aproximar/afastar com dois, ocultar catálogo e restaurar câmera.
+- Registrar falhas de carregamento, enquadramento, contatos e desempenho.
+
+Próximo incremento: ampliar catálogo gratuito com personagens, equipamentos e objetos de contexto compatíveis; preservar baseline e manter sala única. Nenhum mundo ou história antes da aprovação do laboratório.
