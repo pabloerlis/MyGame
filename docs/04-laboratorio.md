@@ -1,6 +1,8 @@
 # Laboratório Android — especificação e aceite
 
 ## Experiência
+O Android em retrato é a plataforma exclusiva de avaliação nesta etapa, não a plataforma final do jogo. A cena, catálogo, reprodução, física e revisão não devem depender de toque ou orientação; UI e gestos do laboratório são adaptadores. Não produzir APK e build PC em paralelo.
+
 Retrato, espaço mínimo por ação, personagem com rosto original, fundo neutro, iluminação simples. Cena 3D ocupa a área principal. Menu recolhível de categorias: personagens, movimentos, equipamentos, objetos, interações e revisão. Busca e seleção imediata; modo loop ou único; no único mostrar botão Play. Controles avançados contextuais: pausa, velocidade, timeline, frame a frame, root motion, esqueleto/colisões. Câmera orbitável 360°, inclinação, pinça/zoom, reset, enquadramento frontal/lateral/traseiro, isométrico e terceira pessoa. Não sobrepor controles à cena; evitar rolagem desnecessária.
 
 ## Matriz de capacidades
