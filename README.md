@@ -2,7 +2,9 @@
 
 RPG 3D de ação, sobrevivência, exploração e progressão, com identidade própria e estética low-poly de fantasia. PC como plataforma-alvo do jogo final; Android como plataforma exclusiva de testes e entregas da etapa de laboratório; experiência offline; ferramentas e assets gratuitos. O projeto inicia pelo laboratório de validação, não pelo mundo do jogo.
 
-## Estado: 0.1.0-alpha.18 — orientação adaptativa do corpo (CI pendente)
+## Estado: 0.1.0-alpha.19 — equilíbrio geométrico de apoio (CI pendente)
+
+Correção opcional da projeção do tronco sobre a faixa entre dois apoios superiores registrados, com limite, guarda de alcance e colisão aproximada. Alpha.17 e alpha.18 aprovadas no CI; alpha.18 publicada.
 
 Giro horizontal opcional ajustado por dois ou mais contatos, limite angular, guarda aproximada do arco de movimento e diagnóstico por JSON. Recalcula a translação após o giro. Mantém a animação original e o reset determinístico.
 

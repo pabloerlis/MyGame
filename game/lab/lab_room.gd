@@ -5,6 +5,17 @@ const ContactIK = preload("res://lab/contact_ik.gd")
 var support_solver = ContactIK.new()
 const ContextGeometry = preload("res://lab/context_contact.gd")
 const BodyWarp = preload("res://lab/body_warp.gd")
+const Balance = preload("res://lab/support_balance.gd")
+var balance_enabled: CheckButton
+var balance_limit: HSlider
+var balance_label: Label
+var balance_state := "disabled"
+var balance_before := -1.0
+var balance_after := -1.0
+var balance_requested := Vector3.ZERO
+var balance_center := Vector3.ZERO
+var balance_feet := PackedVector3Array()
+const BALANCE_RADIUS := 0.08
 var warp_root: Node3D
 var warp_turn: CheckButton
 var warp_turn_limit: HSlider
@@ -1659,6 +1670,7 @@ func _review_entry() -> Dictionary:
 	entry["supportIK"] = _support_snapshot()
 	entry["contextIK"] = _context_ik_snapshot()
 	entry["bodyWarp"] = _warp_snapshot()
+	entry["balance"] = _balance_snapshot()
 	entry["notes"] = review_notes.text
 	entry["build"] = ProjectSettings.get_setting("application/config/version")
 	entry["itemScale"] = _vjson(_object_scale(item_index))
@@ -2137,7 +2149,9 @@ func _update_context_ik() -> void:
 		var tip := skeleton.to_global(skeleton.get_bone_global_pose(bone).origin)
 		offsets.append(BodyWarp.proposed_offset(tip, goal, 1.0, warp_limit.value / 100.0, warp_axis.selected))
 	var proposed := BodyWarp.compromise(offsets, weights, warp_limit.value / 100.0)
+	proposed = _balance_proposal(active, proposed)
 	_apply_body_warp(first, first_goal, proposed)
+	_finish_balance()
 	if warp_turn.button_pressed and warp_enabled.button_pressed:
 		warp_label.text += "\nGiro: %.1f / %.1f° (%s)" % [rad_to_deg(warp_yaw), rad_to_deg(warp_yaw_requested), "bloqueado" if warp_yaw_state == "blocked" else ("sem referência" if warp_yaw_state == "insufficient" else "aplicado")]
 	var lines := PackedStringArray()
@@ -2245,6 +2259,7 @@ func _create_warp_ui(parent: VBoxContainer) -> void:
 		turn_label.text = "Limite de giro: %.0f°" % value
 		_update_context_ik()
 	)
+	_create_balance_ui(parent)
 	var save := Button.new()
 	save.text = "Salvar deslocamento para este contato"
 	parent.add_child(save)
@@ -2267,6 +2282,7 @@ func _reset_warp_frame() -> void:
 	warp_requested = Vector3.ZERO
 	warp_fraction = 0.0
 	warp_state = "disabled"
+	_reset_balance()
 	if is_instance_valid(warp_label):
 		warp_label.text = "Sem deslocamento do corpo nesta fase."
 
@@ -2342,7 +2358,7 @@ func _save_warp_for_contact() -> void:
 	if not context_ik_profiles.has(key):
 		warp_label.text = "Capture um contato primeiro."
 		return
-	warp_profiles[key] = {"enabled": warp_enabled.button_pressed, "axes": warp_axis.selected, "limitCm": warp_limit.value, "turn": warp_turn.button_pressed, "turnLimitDeg": warp_turn_limit.value}
+	warp_profiles[key] = {"enabled": warp_enabled.button_pressed, "axes": warp_axis.selected, "limitCm": warp_limit.value, "turn": warp_turn.button_pressed, "turnLimitDeg": warp_turn_limit.value, "balance": balance_enabled.button_pressed, "balanceLimitCm": balance_limit.value}
 	_save_warp_profiles()
 	warp_label.text = "Perfil de deslocamento salvo."
 
@@ -2355,6 +2371,8 @@ func _restore_warp_for_contact() -> void:
 	var profile: Dictionary = warp_profiles[key]
 	warp_enabled.set_pressed_no_signal(bool(profile.get("enabled", false)))
 	warp_axis.select(clampi(int(profile.get("axes", 0)), 0, 2))
+	balance_enabled.set_pressed_no_signal(bool(profile.get("balance", false)))
+	balance_limit.value = clampf(float(profile.get("balanceLimitCm", 15.0)), 5.0, 30.0)
 	warp_turn.set_pressed_no_signal(bool(profile.get("turn", false)))
 	warp_turn_limit.value = clampf(float(profile.get("turnLimitDeg", 30.0)), 5.0, 90.0)
 	warp_limit.value = clampf(float(profile.get("limitCm", 35.0)), 5.0, 100.0)
@@ -2377,3 +2395,120 @@ func _load_warp_profiles() -> void:
 
 func _warp_snapshot() -> Dictionary:
 	return {"enabled": warp_enabled.button_pressed, "axes": warp_axis.selected, "limitCm": warp_limit.value, "state": warp_state, "offset": _vjson(warp_offset), "requested": _vjson(warp_requested), "safeFraction": warp_fraction, "turnEnabled": warp_turn.button_pressed, "turnLimitDeg": warp_turn_limit.value, "yawDeg": rad_to_deg(warp_yaw), "yawRequestedDeg": rad_to_deg(warp_yaw_requested), "yawState": warp_yaw_state, "collisionApproximation": "torso_points_expanded_box"}
+
+func _create_balance_ui(parent: VBoxContainer) -> void:
+	_section_heading(parent, "Equilíbrio de apoio (experimental)", "Somente dois pés registrados na face superior. Estimativa geométrica, não simulação de forças.")
+	balance_enabled = CheckButton.new()
+	balance_enabled.text = "Corrigir projeção do tronco sobre os pés"
+	parent.add_child(balance_enabled)
+	balance_enabled.toggled.connect(func(_value): _update_context_ik())
+	var limit_label := Label.new()
+	limit_label.text = "Limite de ajuste: 15 cm"
+	parent.add_child(limit_label)
+	balance_limit = HSlider.new()
+	balance_limit.min_value = 5
+	balance_limit.max_value = 30
+	balance_limit.step = 5
+	balance_limit.value = 15
+	balance_limit.custom_minimum_size.y = 64
+	parent.add_child(balance_limit)
+	balance_limit.value_changed.connect(func(value: float):
+		limit_label.text = "Limite de ajuste: %.0f cm" % value
+		_update_context_ik()
+	)
+	balance_label = Label.new()
+	balance_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	parent.add_child(balance_label)
+	_reset_balance()
+
+func _reset_balance() -> void:
+	balance_state = "disabled"
+	balance_before = -1.0
+	balance_after = -1.0
+	balance_requested = Vector3.ZERO
+	balance_center = Vector3.ZERO
+	balance_feet.clear()
+	if is_instance_valid(balance_label):
+		balance_label.text = "Sem análise de equilíbrio nesta fase."
+
+func _balance_proposal(active: Array, proposed: Vector3) -> Vector3:
+	if not is_instance_valid(balance_enabled) or not balance_enabled.button_pressed:
+		return proposed
+	if not warp_enabled.button_pressed or warp_axis.selected == 2:
+		balance_state = "translation_disabled"
+		balance_label.text = "Ative deslocamento horizontal ou em todos os eixos."
+		return proposed
+	balance_state = "no_double_support"
+	var feet := PackedVector3Array()
+	var strength := 1.0
+	for contact in active:
+		var bone: int = contact["bone"]
+		var profile: Dictionary = context_ik_profiles[contact["key"]]
+		if "foot" in str(skeleton.get_bone_name(bone)).to_lower() and profile.get("surface", "") == "top_box":
+			var collision: CollisionShape3D = contact["shape"]
+			if collision.global_basis.y.normalized().dot(Vector3.UP) < 0.98:
+				continue
+			var weight: float = contact["weight"]
+			if weight > 0.5:
+				feet.append(contact["goal"])
+				strength = minf(strength, smoothstep(0.5, 1.0, weight))
+	if feet.size() != 2 or absf(feet[0].y - feet[1].y) > 0.10 or feet[0].distance_to(feet[1]) < 0.05:
+		balance_label.text = "Aguardando dois apoios superiores distintos."
+		return proposed
+	# Use hips/spine/chest points as a geometric trunk center, not true COM.
+	var torso := _torso_points_world()
+	if torso.is_empty():
+		balance_state = "no_torso"
+		balance_label.text = "Rig sem referência de tronco."
+		return proposed
+	var center := Vector3.ZERO
+	for point in torso:
+		center += point
+	center /= float(torso.size())
+	if center.y <= maxf(feet[0].y, feet[1].y) + 0.10:
+		balance_state = "invalid_posture"
+		balance_label.text = "Tronco não está acima dos apoios."
+		return proposed
+	balance_center = center
+	balance_feet = feet
+	balance_before = Balance.support_error(center + proposed, feet[0], feet[1], BALANCE_RADIUS) * 100.0
+	var extra := Balance.correction(center + proposed, feet[0], feet[1], BALANCE_RADIUS, balance_limit.value / 100.0) * strength
+	var candidate := (proposed + extra).limit_length(warp_limit.value / 100.0)
+	if extra.is_zero_approx():
+		balance_state = "aligned"
+		return proposed
+	# Reject a balance adjustment that creates an unreachable limb or
+	# increases an already unreachable target's excess.
+	for contact in active:
+		var bone: int = contact["bone"]
+		var chain := ContactIK.chain(skeleton, bone)
+		if chain.size() != 3:
+			continue
+		var a := skeleton.to_global(skeleton.get_bone_global_pose(chain[0]).origin)
+		var b := skeleton.to_global(skeleton.get_bone_global_pose(chain[1]).origin)
+		var c := skeleton.to_global(skeleton.get_bone_global_pose(chain[2]).origin)
+		var goal: Vector3 = contact["goal"]
+		if not ContactIK.reachable(a + candidate, b + candidate, c + candidate, goal):
+			balance_state = "reach_limited"
+			balance_label.text = "Ajuste recusado: um contato ficaria fora do alcance."
+			return proposed
+	if Balance.support_error(center + candidate, feet[0], feet[1], BALANCE_RADIUS) >= balance_before / 100.0:
+		balance_state = "limit_reached"
+		return proposed
+	balance_requested = candidate - proposed
+	balance_state = "proposed"
+	return candidate
+
+func _finish_balance() -> void:
+	if balance_feet.size() != 2:
+		return
+	balance_after = Balance.support_error(balance_center + warp_offset, balance_feet[0], balance_feet[1], BALANCE_RADIUS) * 100.0
+	if balance_state == "proposed":
+		balance_state = "improved" if balance_after + 0.01 < balance_before else "limited"
+	balance_label.text = "Projeção do tronco: %.1f → %.1f cm fora da faixa de apoio | %s" % [balance_before, balance_after, "estimativa geométrica" if balance_state in ["improved", "aligned"] else "ajuste limitado"]
+
+func _balance_snapshot() -> Dictionary:
+	var feet: Array = []
+	for p in balance_feet:
+		feet.append(_vjson(p))
+	return {"enabled": balance_enabled.button_pressed, "limitCm": balance_limit.value, "state": balance_state, "beforeCm": balance_before, "afterCm": balance_after, "requested": _vjson(balance_requested), "trunkCenter": _vjson(balance_center), "footAnchors": feet, "supportRadiusCm": BALANCE_RADIUS * 100.0, "method": "trunk_projection_two_registered_feet"}

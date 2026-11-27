@@ -412,7 +412,7 @@ func _run() -> void:
 	# Programmatic assignment does not guarantee TextEdit.text_changed; mirror explicit UI save.
 	lab._save_reviews()
 	var report: Variant = JSON.parse_string(lab._report_json())
-	if not report is Dictionary or report["reviews"].size() != 1 or report["reviews"][0]["notes"] != "Teste de encaixe: mão esquerda" or report["current"]["notes"] != "Observação atual" or report["build"] != "0.1.0-alpha.18" or not report["current"]["bodyWarp"].has("yawDeg") or not report["current"]["contextIK"].has("contacts") or not report["current"].has("bodyWarp") or not report.has("bodyWarpProfiles") or not report["current"].has("contextIK") or not report.has("contextContactProfiles") or not report["current"].has("supportIK") or not report.has("supportProfiles"):
+	if not report is Dictionary or report["reviews"].size() != 1 or report["reviews"][0]["notes"] != "Teste de encaixe: mão esquerda" or report["current"]["notes"] != "Observação atual" or report["build"] != "0.1.0-alpha.19" or not report["current"].has("balance") or not report["current"]["bodyWarp"].has("yawDeg") or not report["current"]["contextIK"].has("contacts") or not report["current"].has("bodyWarp") or not report.has("bodyWarpProfiles") or not report["current"].has("contextIK") or not report.has("contextContactProfiles") or not report["current"].has("supportIK") or not report.has("supportProfiles"):
 		push_error("Review JSON failed")
 		quit(1)
 		return
@@ -470,6 +470,11 @@ func _run() -> void:
 		quit(1)
 		return
 	print("BODY_YAW_OK: weighted fit, limit, arc guard and reset.")
+	if not _test_balance():
+		push_error("Support balance geometry failed")
+		quit(1)
+		return
+	print("BALANCE_OK: projection, support margin, axis and correction limits.")
 	quit(0)
 
 func _test_support_ik() -> bool:
@@ -606,4 +611,18 @@ func _test_body_yaw() -> bool:
 	ok = ok and not w.yaw_is_clear(PackedVector3Array([Vector3(1, 0, 0)]), Vector3.ZERO, PI / 2.0, box, half, 0.05)
 	box.origin = Vector3(0, 2, 0)
 	ok = ok and w.yaw_is_clear(PackedVector3Array([Vector3(1, 0, 0)]), Vector3.ZERO, PI / 2.0, box, half, 0.05)
+	return ok
+
+func _test_balance() -> bool:
+	var bal = preload("res://lab/support_balance.gd")
+	var a := Vector3(-0.2, 0.4, 0)
+	var b := Vector3(0.2, 0.4, 0)
+	var center := Vector3(0, 1.2, 0.3)
+	var delta: Vector3 = bal.correction(center, a, b, 0.08, 0.15)
+	var ok := delta.is_equal_approx(Vector3(0, 0, -0.15))
+	ok = ok and is_equal_approx(bal.support_error(center, a, b, 0.08), 0.22)
+	ok = ok and is_equal_approx(bal.support_error(center + delta, a, b, 0.08), 0.07)
+	ok = ok and bal.correction(Vector3(0, 2, 0.03), a, b, 0.08, 0.15).is_zero_approx()
+	ok = ok and bal.closest_support(Vector3(0.8, 2, 0), a, b).is_equal_approx(Vector3(0.2, 0, 0))
+	ok = ok and bal.closest_support(Vector3(0.8, 2, 0), a, a).is_equal_approx(Vector3(-0.2, 0, 0))
 	return ok
