@@ -1,0 +1,17 @@
+{
+  "repository": "trebeljahr/quaternius-showcase",
+  "revision": "0128ca510d653bb04d6d1e4885bd8890b5050b4f",
+  "licenseSource": "https://github.com/trebeljahr/quaternius-showcase/blob/0128ca510d653bb04d6d1e4885bd8890b5050b4f/LICENSES.md",
+  "pack": {
+    "id": "medieval_village_pack",
+    "license": "CC0-1.0",
+    "files": [
+      {
+        "name": "Crate.glb",
+        "path": "public/glb/medieval_village_pack/Crate.glb",
+        "bytes": 35776,
+        "gitBlob": "1643dc194a7141b2cc7eefbbf3e9a871f8b76cc6"
+      }
+    ]
+  }
+}

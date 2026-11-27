@@ -1,0 +1,17 @@
+{
+  "repository": "trebeljahr/quaternius-showcase",
+  "revision": "0128ca510d653bb04d6d1e4885bd8890b5050b4f",
+  "licenseSource": "https://github.com/trebeljahr/quaternius-showcase/blob/0128ca510d653bb04d6d1e4885bd8890b5050b4f/LICENSES.md",
+  "pack": {
+    "id": "nature_pack",
+    "license": "CC0-1.0",
+    "files": [
+      {
+        "name": "CommonTree_1.glb",
+        "path": "public/glb/nature_pack/CommonTree_1.glb",
+        "bytes": 158708,
+        "gitBlob": "1ec431431a6b9ce4ffcefb5460426457f573eafc"
+      }
+    ]
+  }
+}
