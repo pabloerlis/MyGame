@@ -25,3 +25,6 @@ Próximo incremento: ampliar catálogo gratuito com personagens, equipamentos e 
 
 ## 0.1.0-alpha.2 — navegação de movimentos
 Implementado: faixa inferior permanente com botões Anterior/Próxima, posição e nome do clip. Navegação circular na cena atual, seleção sincronizada com catálogo, reprodução imediata e manutenção do modo loop/único. Controle adicional de velocidade 0,25× a 2× sem alterar o clip original. Testes automatizados ampliados para verificar navegação, visibilidade com catálogo oculto, modo e velocidade nas quatro cenas. Build e validação física ainda dependem de execução confirmada. Nenhum asset novo neste incremento.
+
+
+CI alpha.2 confirmada: [run 46002174709](https://github.com/pabloerlis/MyGame/actions/runs/46002174709), SMOKE_OK (2 packs, 172 variantes) e TRANSPORT_OK (4 cenas, navegação circular, sincronização, visibilidade, modo e velocidade). APK assinado de 31.294.654 bytes, [download](https://github.com/pabloerlis/MyGame/releases/download/lab-alpha-46002174709/MyGame-Lab.apk). SHA-256: 04ae7b909033a30d2424a64984ae51d0a69b68a3a920a0fc07add8aea6299270. Teste físico pendente; aviso de ausência de ícone permanece. Chave de debug não persistente pode exigir desinstalação da versão anterior.
