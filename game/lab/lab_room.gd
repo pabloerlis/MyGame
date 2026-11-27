@@ -213,7 +213,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				if index != event.index:
 					var other: Vector2 = touches[index]
 					var before := previous.distance_to(other)
-					var after := event.position.distance_to(other)
+					var after: float = event.position.distance_to(other)
 					if before > 1.0 and after > 1.0:
 						distance = clampf(distance * before / after, 1.5, 12.0)
 		else:
