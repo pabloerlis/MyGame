@@ -4,9 +4,9 @@
 |---|---|---|
 | 0.0.1 | Documentação, decisão preliminar, fontes | Revisar objetivos |
 | 0.0.2 | Aquisição CC0, manifestos, hashes e relatórios de rig/escala | Licenças e integridade |
-| 0.1.0 | APK laboratório mínimo: personagem real, câmera, animação, arma e prop | Instalação e teste visual |
+| 0.1.0 | APK laboratório em sala única: personagem real, câmera, animação, arma e prop | Instalação e teste visual |
 | 0.2.0 | Catálogo completo gratuito, busca, roupas e armas, reprodução avançada | Compatibilidade documentada |
-| 0.3.0 | Contextos de contato, correções, revisão JSON persistente | Aprovação por ação/contexto |
+| 0.3.0 | Contextos dinâmicos na mesma sala, correções, revisão JSON persistente | Aprovação por ação/contexto |
 | 0.4.0 | Integração de combate, interação e múltiplos atores | Estabilidade e desempenho |
 | 1.0 laboratório | Capacidades necessárias validadas e pendências aceitas | Aprovação explícita do usuário |
 | Transição PC | Exportar o mesmo núcleo, adaptar entrada/UI e perfis gráficos, verificar paridade | Só após gate do laboratório; testes próprios no PC |
@@ -25,7 +25,7 @@ Separar unitário, integração, smoke em emulador e visual/performance em apare
 - Construir matriz de cobertura de modelos, peças, rigs, animações, efeitos e objetos; pesquisar fontes gratuitas complementares para lacunas. Reportar cobertura real e não criar arte/animações originais sem aprovação explícita.
 - Montar pipeline determinístico e validar clone limpo.
 - Fixar versão estável da engine e configuração Android.
-- Implementar fatia vertical de laboratório com assets reais.
+- Implementar fatia vertical de laboratório em uma única sala persistente com assets reais, troca dinâmica de contexto, reset e câmera livre. Testar alternância de categorias sem troca de sala e sem resíduos de objetos/colisões.
 - Gerar APK e relatório de testes; publicar somente quando houver diferença observável.
 
 Riscos: disponibilidade/licença de assets, incompatibilidade de rig, tamanho e quota GitHub, retargeting e contatos, fragmentação Android. Mitigação: catálogo CC0, perfis de rig, deduplicação, spike nativo, medição em dispositivo e gates. Nenhuma implementação ou benchmark ainda concluído.
