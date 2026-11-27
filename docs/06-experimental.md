@@ -22,3 +22,6 @@ Limites: smoke test em Linux valida importação e seleção de clips, não rend
 - Registrar falhas de carregamento, enquadramento, contatos e desempenho.
 
 Próximo incremento: ampliar catálogo gratuito com personagens, equipamentos e objetos de contexto compatíveis; preservar baseline e manter sala única. Nenhum mundo ou história antes da aprovação do laboratório.
+
+## 0.1.0-alpha.2 — navegação de movimentos
+Implementado: faixa inferior permanente com botões Anterior/Próxima, posição e nome do clip. Navegação circular na cena atual, seleção sincronizada com catálogo, reprodução imediata e manutenção do modo loop/único. Controle adicional de velocidade 0,25× a 2× sem alterar o clip original. Testes automatizados ampliados para verificar navegação, visibilidade com catálogo oculto, modo e velocidade nas quatro cenas. Build e validação física ainda dependem de execução confirmada. Nenhum asset novo neste incremento.

@@ -17,6 +17,7 @@ func _run() -> void:
 		return
 	var count := 0
 	var packs := {}
+	var navigation_checks := 0
 	for i in range(lab.records.size()):
 		lab._load_scene(i)
 		if lab.player == null or lab.clips.is_empty():
@@ -24,6 +25,45 @@ func _run() -> void:
 			quit(1)
 			return
 		packs[lab.records[i]["pack"]] = true
+		lab.catalog_panel.hide()
+		lab._select_clip(0)
+		lab.previous_button.pressed.emit()
+		if lab.clip_index != lab.clips.size() - 1 or lab.clip_picker.selected != lab.clip_index or lab.selected_clip != StringName(lab.clips[lab.clip_index]):
+			push_error("Previous navigation wrap/sync failed")
+			quit(1)
+			return
+		lab.next_button.pressed.emit()
+		if lab.clip_index != 0 or lab.clip_picker.selected != 0 or not lab.player.is_playing():
+			push_error("Next navigation wrap/replay failed")
+			quit(1)
+			return
+		if not lab.previous_button.is_visible_in_tree() or not lab.next_button.is_visible_in_tree():
+			push_error("Transport hidden with catalog")
+			quit(1)
+			return
+		lab.loop_toggle.set_pressed_no_signal(false)
+		lab.next_button.pressed.emit()
+		if lab.player.get_animation(lab.selected_clip).loop_mode != Animation.LOOP_NONE:
+			push_error("One-shot mode not preserved")
+			quit(1)
+			return
+		lab.loop_toggle.set_pressed_no_signal(true)
+		lab.previous_button.pressed.emit()
+		if lab.player.get_animation(lab.selected_clip).loop_mode != Animation.LOOP_LINEAR:
+			push_error("Loop mode not preserved")
+			quit(1)
+			return
+		lab.speed_picker.item_selected.emit(0)
+		if not is_equal_approx(lab.player.speed_scale, 0.25):
+			push_error("Slow motion failed")
+			quit(1)
+			return
+		lab.speed_picker.item_selected.emit(2)
+		if not is_equal_approx(lab.player.speed_scale, 1.0):
+			push_error("Normal speed reset failed")
+			quit(1)
+			return
+		navigation_checks += 1
 		for j in range(lab.clips.size()):
 			lab._select_clip(j)
 			var animation: Animation = lab.player.get_animation(lab.selected_clip)
@@ -37,4 +77,5 @@ func _run() -> void:
 		quit(1)
 		return
 	print("SMOKE_OK: ", packs.size(), " packs; ", count, " imported clip variants.")
+	print("TRANSPORT_OK: ", navigation_checks, " scenes; wrap, sync, visibility, playback mode and speed.")
 	quit(0)

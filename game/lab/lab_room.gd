@@ -19,6 +19,14 @@ var panel: VBoxContainer
 var clips: PackedStringArray = []
 var selected_clip: StringName
 var original_modes := {}
+var clip_index := -1
+var previous_button: Button
+var next_button: Button
+var clip_caption: Label
+var catalog_panel: PanelContainer
+var speed_picker: OptionButton
+const SPEEDS := [0.25, 0.5, 1.0, 1.5, 2.0]
+var playback_speed := 1.0
 
 func _ready() -> void:
 	var sun := DirectionalLight3D.new()
@@ -89,20 +97,53 @@ func _create_ui() -> void:
 		distance = 4.0
 		_update_camera()
 	)
+	# Persistent transport: independent of the collapsible catalog.
+	var nav := PanelContainer.new()
+	root.add_child(nav)
+	nav.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	nav.offset_left = 12
+	nav.offset_right = -12
+	nav.offset_top = -86
+	nav.offset_bottom = -16
+	var nav_row := HBoxContainer.new()
+	nav.add_child(nav_row)
+	previous_button = Button.new()
+	previous_button.text = "◀ Anterior"
+	previous_button.custom_minimum_size = Vector2(112, 62)
+	previous_button.disabled = true
+	nav_row.add_child(previous_button)
+	previous_button.pressed.connect(func(): _step_clip(-1))
+	clip_caption = Label.new()
+	clip_caption.text = "—"
+	clip_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	clip_caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	clip_caption.clip_text = true
+	clip_caption.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	clip_caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	nav_row.add_child(clip_caption)
+	next_button = Button.new()
+	next_button.text = "Próxima ▶"
+	next_button.custom_minimum_size = Vector2(112, 62)
+	next_button.disabled = true
+	nav_row.add_child(next_button)
+	next_button.pressed.connect(func(): _step_clip(1))
 	var bottom := PanelContainer.new()
+	catalog_panel = bottom
 	root.add_child(bottom)
 	bottom.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	bottom.offset_left = 12
 	bottom.offset_right = -12
-	bottom.offset_top = -240
-	bottom.offset_bottom = -20
+	bottom.offset_top = -300
+	bottom.offset_bottom = -94
 	panel = VBoxContainer.new()
 	bottom.add_child(panel)
 	toggle.pressed.connect(func(): bottom.visible = not bottom.visible)
 	scene_picker = OptionButton.new()
+	scene_picker.fit_to_longest_item = false
 	panel.add_child(scene_picker)
 	scene_picker.item_selected.connect(_load_scene)
 	clip_picker = OptionButton.new()
+	clip_picker.fit_to_longest_item = false
 	panel.add_child(clip_picker)
 	clip_picker.item_selected.connect(_select_clip)
 	var row := HBoxContainer.new()
@@ -123,11 +164,22 @@ func _create_ui() -> void:
 		if is_instance_valid(player):
 			player.pause()
 	)
+	speed_picker = OptionButton.new()
+	speed_picker.fit_to_longest_item = false
+	for value in SPEEDS:
+		speed_picker.add_item("Velocidade %s×" % str(value))
+	speed_picker.select(2)
+	panel.add_child(speed_picker)
+	speed_picker.item_selected.connect(_set_speed)
 	details = Label.new()
 	details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	panel.add_child(details)
 
 func _load_scene(index: int) -> void:
+	if is_instance_valid(player):
+		player.stop()
+		for clip in original_modes:
+			player.get_animation(clip).loop_mode = original_modes[clip]
 	if is_instance_valid(actor):
 		remove_child(actor)
 		actor.queue_free()
@@ -137,6 +189,11 @@ func _load_scene(index: int) -> void:
 	clip_picker.clear()
 	clips.clear()
 	selected_clip = &""
+	clip_index = -1
+	_update_transport()
+	if index < 0 or index >= records.size():
+		return
+	scene_picker.select(index)
 	var record: Dictionary = records[index]
 	var packed: Resource = load(str(record["path"]))
 	if not packed is PackedScene:
@@ -154,6 +211,7 @@ func _load_scene(index: int) -> void:
 		status.text = "Sem AnimationPlayer"
 		return
 	clips = player.get_animation_list()
+	player.speed_scale = playback_speed
 	for clip in clips:
 		clip_picker.add_item(clip)
 		original_modes[clip] = player.get_animation(clip).loop_mode
@@ -180,8 +238,30 @@ func _find_player(node: Node) -> AnimationPlayer:
 func _select_clip(index: int) -> void:
 	if index < 0 or index >= clips.size():
 		return
+	clip_index = index
 	selected_clip = StringName(clips[index])
+	clip_picker.select(index)
+	_update_transport()
 	_replay()
+
+func _step_clip(direction: int) -> void:
+	if clips.is_empty() or not is_instance_valid(player):
+		return
+	_select_clip(posmod(clip_index + direction, clips.size()))
+
+func _update_transport() -> void:
+	var available := clip_index >= 0 and clip_index < clips.size()
+	previous_button.disabled = not available or clips.size() < 2
+	next_button.disabled = not available or clips.size() < 2
+	clip_caption.text = "%d/%d\n%s" % [clip_index + 1, clips.size(), selected_clip] if available else "—"
+
+func _set_speed(index: int) -> void:
+	if index < 0 or index >= SPEEDS.size():
+		return
+	playback_speed = float(SPEEDS[index])
+	speed_picker.select(index)
+	if is_instance_valid(player):
+		player.speed_scale = playback_speed
 
 func _replay() -> void:
 	if not is_instance_valid(player) or selected_clip == &"":

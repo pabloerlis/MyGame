@@ -2,7 +2,9 @@
 
 RPG 3D de ação, sobrevivência, exploração e progressão, com identidade própria e estética low-poly de fantasia. PC como plataforma-alvo do jogo final; Android como plataforma exclusiva de testes e entregas da etapa de laboratório; experiência offline; ferramentas e assets gratuitos. O projeto inicia pelo laboratório de validação, não pelo mundo do jogo.
 
-## Estado: 0.1.0-alpha.1 — primeiro APK experimental publicado
+## Estado: 0.1.0-alpha.2 — navegação de movimentos (em validação CI)
+
+Implementados controles permanentes Anterior/Próxima, posição e nome do clipe, navegação circular na cena atual e velocidade de 0,25× a 2×. Abaixo permanece o APK alpha.1 já verificado até confirmação do novo build.
 
 Sala única e duas bibliotecas de animação CC0 importadas: quatro cenas GLB e 172 instâncias de clipes. CI aprovada, assinatura verificada e APK Android ARM64 publicado (31,3 MB). Validação visual e execução física no Android ainda pendentes; equipamentos, roupas e catálogo ampliado permanecem no roadmap.
 
