@@ -451,6 +451,29 @@ func _run() -> void:
 		push_error("Context selection did not highlight item")
 		quit(1)
 		return
+	await process_frame
+	var quick_rect: Rect2 = lab.quick_panel.get_global_rect()
+	var screen: Rect2 = root.get_visible_rect()
+	if quick_rect.end.x > screen.end.x + 1.0 or quick_rect.end.y > screen.end.y + 1.0 or quick_rect.position.y < 68.0 or lab.quick_review_fields.visible:
+		push_error("Context overlay bounds or compact review separation failed")
+		quit(1)
+		return
+	var old_dock: bool = lab.quick_dock_top
+	lab._flip_quick_dock()
+	if lab.quick_dock_top == old_dock:
+		push_error("Context dock toggle failed")
+		quit(1)
+		return
+	lab._select_quick_page(2)
+	if not lab.quick_review_fields.visible:
+		push_error("Context review tab did not open")
+		quit(1)
+		return
+	lab._select_quick_page(0)
+	if lab.quick_review_fields.visible or not is_instance_valid(lab.quick_axis):
+		push_error("Context transform tab did not restore")
+		quit(1)
+		return
 	var original: Transform3D = lab.item_node.transform
 	lab.quick_axis.select(0)
 	lab._quick_nudge(4, lab.quick_axis, 1)

@@ -34,6 +34,16 @@ var drag_steps := 0.0
 var quick_draft := false
 var quick_detail_scroll: ScrollContainer
 var quick_expanded := false
+var quick_dock_top := false
+var quick_page := 0
+var quick_tabs: HBoxContainer
+var quick_page_buttons: Array[Button] = []
+var quick_review_fields: VBoxContainer
+var quick_opacity_slider: HSlider
+var quick_opacity := 0.88
+var quick_dock_button: Button
+var quick_expand_button: Button
+var quick_review_hint: Label
 var quick_choice_pending := false
 var quick_verdict: OptionButton
 var camera_pan_mode := true
@@ -3046,74 +3056,161 @@ func _fit_seated_demo() -> void:
 func _create_quick_menu(root: Control) -> void:
 	quick_panel = PanelContainer.new()
 	root.add_child(quick_panel)
-	quick_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
-	quick_panel.offset_left = 12
-	quick_panel.offset_right = -12
-	quick_panel.offset_top = -490
+	quick_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
 	quick_panel.clip_contents = true
-	quick_panel.add_theme_stylebox_override("panel", _flat(Color("#17212eea"), 22, 12))
-	quick_panel.offset_bottom = -16
+	var theme := _mobile_theme()
+	theme.default_font_size = 18
+	theme.set_constant("separation", "HBoxContainer", 6)
+	theme.set_constant("separation", "VBoxContainer", 6)
+	quick_panel.theme = theme
+	quick_panel.add_theme_stylebox_override("panel", _flat(Color(0.09, 0.13, 0.19, quick_opacity), 16, 10))
 	var layout := VBoxContainer.new()
-	layout.add_theme_constant_override("separation", 6)
+	layout.add_theme_constant_override("separation", 5)
 	quick_panel.add_child(layout)
 	var header := HBoxContainer.new()
 	layout.add_child(header)
 	quick_target = OptionButton.new()
 	quick_target.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	header.add_child(quick_target)
-	quick_target.item_selected.connect(func(_index): _rebuild_quick_controls())
 	quick_target.fit_to_longest_item = false
-	var expand := _quick_button(header, "↕", _toggle_quick_expanded)
-	expand.custom_minimum_size.x = 52
-	expand.size_flags_horizontal = Control.SIZE_SHRINK_END
-	var close := _quick_button(header, "Fechar", _close_quick_menu)
+	quick_target.clip_text = true
+	header.add_child(quick_target)
+	quick_target.item_selected.connect(func(_index):
+		quick_page = 0
+		_rebuild_quick_controls()
+		_choose_quick_dock()
+	)
+	quick_dock_button = _quick_button(header, "↕", _flip_quick_dock)
+	quick_dock_button.tooltip_text = "Mover painel para cima ou para baixo"
+	quick_dock_button.custom_minimum_size.x = 48
+	quick_dock_button.size_flags_horizontal = Control.SIZE_SHRINK_END
+	quick_expand_button = _quick_button(header, "＋", _toggle_quick_expanded)
+	quick_expand_button.tooltip_text = "Expandir ou recolher"
+	quick_expand_button.custom_minimum_size.x = 48
+	quick_expand_button.size_flags_horizontal = Control.SIZE_SHRINK_END
+	var close := _quick_button(header, "×", _close_quick_menu)
+	close.custom_minimum_size.x = 48
 	close.size_flags_horizontal = Control.SIZE_SHRINK_END
+	close.tooltip_text = "Fechar painel"
 	selected_title = Label.new()
-	selected_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	selected_title.add_theme_font_size_override("font_size", 19)
+	selected_title.clip_text = true
+	selected_title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	selected_title.add_theme_font_size_override("font_size", 18)
 	layout.add_child(selected_title)
+	quick_tabs = HBoxContainer.new()
+	layout.add_child(quick_tabs)
 	quick_detail_scroll = ScrollContainer.new()
 	quick_detail_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	quick_detail_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	quick_detail_scroll.custom_minimum_size.y = 126
+	quick_detail_scroll.custom_minimum_size.y = 88
 	layout.add_child(quick_detail_scroll)
 	quick_body = VBoxContainer.new()
 	quick_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	quick_body.add_theme_constant_override("separation", 6)
+	quick_body.add_theme_constant_override("separation", 5)
 	quick_detail_scroll.add_child(quick_body)
 	quick_readout = Label.new()
 	quick_readout.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	quick_readout.add_theme_font_size_override("font_size", 19)
+	quick_readout.add_theme_font_size_override("font_size", 17)
 	layout.add_child(quick_readout)
+	quick_review_fields = VBoxContainer.new()
+	quick_body.add_child(quick_review_fields)
 	quick_notes = LineEdit.new()
-	quick_notes.custom_minimum_size.y = 52
+	quick_notes.custom_minimum_size.y = 46
 	quick_notes.placeholder_text = "Observação (opcional)"
-	layout.add_child(quick_notes)
+	quick_review_fields.add_child(quick_notes)
 	quick_verdict = OptionButton.new()
 	quick_verdict.fit_to_longest_item = false
 	for verdict in ["Não avaliado", "Aprovado", "Precisa de ajustes", "Incompatível"]:
 		quick_verdict.add_item(verdict)
-	layout.add_child(quick_verdict)
+	quick_review_fields.add_child(quick_verdict)
+	quick_review_fields.hide()
 	var actions := HBoxContainer.new()
 	layout.add_child(actions)
 	_quick_button(actions, "Avançado", _open_context_advanced)
 	var confirm := _quick_button(actions, "Confirmar", _confirm_quick_feedback)
-	confirm.add_theme_stylebox_override("normal", _flat(Color("#14665e"), 14, 8))
+	confirm.add_theme_stylebox_override("normal", _flat(Color("#14665e"), 12, 8))
 	quick_status = Label.new()
-	quick_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	quick_status.add_theme_font_size_override("font_size", 17)
+	quick_status.clip_text = true
+	quick_status.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	quick_status.add_theme_font_size_override("font_size", 15)
 	layout.add_child(quick_status)
 	quick_panel.hide()
+	root.resized.connect(_layout_quick_panel)
 	quick_request = HTTPRequest.new()
 	quick_request.timeout = 25.0
 	add_child(quick_request)
 	quick_request.request_completed.connect(_quick_response)
 
+func _layout_quick_panel() -> void:
+	if not is_instance_valid(quick_panel):
+		return
+	var view := get_viewport().get_visible_rect().size
+	var safe_top := 228.0
+	var safe_bottom := view.y - 12.0
+	var usable := maxf(260.0, safe_bottom - safe_top)
+	var desired := minf(usable, (540.0 if quick_expanded else 348.0))
+	var y := safe_top if quick_dock_top else maxf(safe_top, safe_bottom - desired)
+	quick_panel.offset_left = 10
+	quick_panel.offset_right = -10
+	quick_panel.offset_top = y
+	quick_panel.offset_bottom = y + desired
+	if is_instance_valid(quick_expand_button):
+		quick_expand_button.text = "−" if quick_expanded else "＋"
+
+func _choose_quick_dock() -> void:
+	quick_dock_top = false
+	var node := _selected_node()
+	if is_instance_valid(node):
+		var bounds: Rect2 = VisualPick.screen_bounds(node, camera, quick_target.get_selected_id() == 1)
+		if bounds.has_area():
+			var view := get_viewport().get_visible_rect().size
+			var center := bounds.get_center().y
+			quick_dock_top = center > (228.0 + view.y) * 0.5
+	_layout_quick_panel()
+
+func _flip_quick_dock() -> void:
+	quick_dock_top = not quick_dock_top
+	_layout_quick_panel()
+
+func _set_quick_opacity(value: float) -> void:
+	quick_opacity = clampf(value, 0.35, 1.0)
+	var style := quick_panel.get_theme_stylebox("panel") as StyleBoxFlat
+	var color := style.bg_color
+	color.a = quick_opacity
+	style.bg_color = color
+
+func _quick_pages(target: int) -> Array[String]:
+	match target:
+		0: return ["Câmera", "Painel", "Revisão"]
+		1: return ["Movimento", "Corpo", "Revisão"]
+		2: return ["Transformar", "Encaixe", "Apoio", "Revisão"]
+		3: return ["Transformar", "Objeto", "Contato", "Revisão"]
+		4: return ["Transformar", "Peça", "Revisão"]
+	return ["Revisão"]
+
+func _select_quick_page(index: int) -> void:
+	quick_page = index
+	_rebuild_quick_controls()
+
+func _refresh_quick_tabs() -> void:
+	for child in quick_tabs.get_children():
+		quick_tabs.remove_child(child)
+		child.queue_free()
+	quick_page_buttons.clear()
+	var names := _quick_pages(quick_target.get_selected_id())
+	quick_page = clampi(quick_page, 0, names.size() - 1)
+	for i in range(names.size()):
+		var button := _quick_button(quick_tabs, names[i], _select_quick_page.bind(i))
+		button.custom_minimum_size.y = 44
+		button.add_theme_font_size_override("font_size", 17)
+		button.toggle_mode = true
+		button.set_pressed_no_signal(i == quick_page)
+		quick_page_buttons.append(button)
+
 func _quick_button(parent: Control, title: String, action: Callable) -> Button:
 	var button := Button.new()
 	button.text = title
-	button.custom_minimum_size.y = 56
-	button.add_theme_font_size_override("font_size", 20)
+	button.custom_minimum_size.y = 48
+	button.add_theme_font_size_override("font_size", 18)
 	button.clip_text = true
 	button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	button.tooltip_text = title
@@ -3137,21 +3234,24 @@ func _open_target(target: int, slot: int = -1) -> void:
 	if slot >= 0:
 		_switch_slot(slot)
 	quick_target.clear()
-	quick_target.add_item("Câmera / cena", 0)
+	quick_target.add_item("Câmera", 0)
 	if item_mode:
 		quick_target.add_item("Peça isolada", 4)
 	else:
 		if is_instance_valid(player):
-			quick_target.add_item("Personagem / movimento", 1)
+			quick_target.add_item("Corpo", 1)
 		if is_instance_valid(skeleton):
 			quick_target.add_item("Equipamento", 2)
-		quick_target.add_item("Objeto de contexto", 3)
+		quick_target.add_item("Objeto", 3)
 	var idx := quick_target.get_item_index(target)
 	quick_target.select(idx if idx >= 0 else 0)
+	quick_page = 0
+	quick_expanded = false
 	_rebuild_quick_controls()
-	quick_status.text = "Só envia ao confirmar · %d pendentes" % quick_outbox.size()
+	quick_status.text = "Confirmar registra · %d pendentes" % quick_outbox.size()
 	hud_nav.hide()
 	quick_panel.show()
+	_choose_quick_dock()
 	_update_selection_outline()
 
 func _close_quick_menu() -> void:
@@ -3162,7 +3262,7 @@ func _close_quick_menu() -> void:
 
 func _toggle_quick_expanded() -> void:
 	quick_expanded = not quick_expanded
-	quick_panel.offset_top = -715 if quick_expanded else -490
+	_layout_quick_panel()
 
 func _open_context_advanced() -> void:
 	var target := quick_target.get_selected_id()
@@ -3278,120 +3378,178 @@ func _rebuild_quick_controls() -> void:
 	quick_size = null
 	quick_time = null
 	quick_gesture_button = null
+	quick_review_fields.hide()
 	for child in quick_body.get_children():
+		if child == quick_review_fields:
+			continue
 		quick_body.remove_child(child)
 		child.queue_free()
 	var target := quick_target.get_selected_id()
+	_refresh_quick_tabs()
 	quick_detail_scroll.scroll_vertical = 0
+	var page_name := _quick_pages(target)[quick_page]
+	if page_name == "Revisão":
+		quick_review_fields.show()
+		_refresh_quick_readout()
+		return
 	var row := _quick_row()
 	match target:
 		0:
-			quick_gesture_button = _quick_button(row, "", _toggle_camera_gesture)
-			_refresh_camera_gesture()
-			_quick_button(row, "Enquadrar", func():
-				yaw = 0.65
-				pitch = 0.24
-				focus = item_focus if item_mode else Vector3(0, 1, 0)
-				distance = item_distance if item_mode else 4.0
-				isometric_view = false
-				_update_camera()
-			)
-			row = _quick_row()
-			_quick_button(row, "Zoom −", func(): _quick_zoom(1.2))
-			_quick_button(row, "Zoom +", func(): _quick_zoom(1.0 / 1.2))
-			var iso := _quick_button(row, "Isometria", func():
-				if not item_mode:
-					isometric_view = not isometric_view
-					if isometric_view:
-						yaw = PI / 4.0
-						pitch = atan(1.0 / sqrt(2.0))
-					_update_camera()
-			)
-			iso.disabled = item_mode
-		1:
-			_quick_button(row, "Personagem", func(): _quick_choose(scene_picker, "Personagem"))
-			_quick_button(row, "Movimento", func(): _quick_choose(clip_picker, "Movimento"))
-			_quick_button(row, "Focar", _focus_selected)
-			row = _quick_row()
-			_quick_button(row, "Pausar", func(): player.pause())
-			_quick_button(row, "Reproduzir", _replay)
-			_quick_button(row, "Loop", func():
-				loop_toggle.button_pressed = not loop_toggle.button_pressed
-			)
-			row = _quick_row()
-			_quick_button(row, "− 1 quadro", _step_time.bind(-1))
-			_quick_button(row, "+ 1 quadro", _step_time.bind(1))
-			quick_time = HSlider.new()
-			quick_time.max_value = 1.0
-			quick_time.step = 0.001
-			quick_time.custom_minimum_size.y = 36
-			quick_body.add_child(quick_time)
-			quick_time.value_changed.connect(_seek_phase)
-			row = _quick_row()
-			_quick_button(row, "Anterior", func(): _step_clip(-1))
-			_quick_button(row, "Próximo", func(): _step_clip(1))
-			var speed := OptionButton.new()
-			speed.fit_to_longest_item = false
-			speed.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			for value in SPEEDS:
-				speed.add_item("%s×" % str(value))
-			speed.select(speed_picker.selected)
-			row.add_child(speed)
-			speed.item_selected.connect(_set_speed)
-		2, 3, 4:
-			if target == 2:
-				_quick_button(row, "Trocar peça", func(): _quick_choose(equipment_picker, "Equipamento"))
-				_quick_button(row, "Trocar osso", func(): _quick_choose(bone_picker, "Osso de encaixe"))
-				_quick_button(row, "Mão E" if active_slot == 0 else "Mão D", func():
-					_switch_slot(1 - active_slot)
-					_rebuild_quick_controls()
-				)
-			elif target == 3:
-				_quick_button(row, "Trocar objeto", func(): _quick_choose(context_picker, "Objeto"))
-				_quick_button(row, "Focar", _focus_selected)
+			if quick_page == 1:
+				var label := Label.new()
+				label.text = "Opacidade do painel contextual"
+				quick_body.add_child(label)
+				quick_opacity_slider = HSlider.new()
+				quick_opacity_slider.min_value = 0.35
+				quick_opacity_slider.max_value = 1.0
+				quick_opacity_slider.step = 0.05
+				quick_opacity_slider.value = quick_opacity
+				quick_opacity_slider.custom_minimum_size.y = 40
+				quick_body.add_child(quick_opacity_slider)
+				quick_opacity_slider.value_changed.connect(_set_quick_opacity)
+				_quick_button(row, "Inverter posição", _flip_quick_dock)
 			else:
-				_quick_button(row, "Trocar peça", func(): _quick_choose(item_picker, "Peça"))
+				quick_gesture_button = _quick_button(row, "", _toggle_camera_gesture)
+				_refresh_camera_gesture()
+				_quick_button(row, "Enquadrar", func():
+					yaw = 0.65
+					pitch = 0.24
+					focus = item_focus if item_mode else Vector3(0, 1, 0)
+					distance = item_distance if item_mode else 4.0
+					isometric_view = false
+					_update_camera()
+				)
+				row = _quick_row()
+				_quick_button(row, "Zoom −", func(): _quick_zoom(1.2))
+				_quick_button(row, "Zoom +", func(): _quick_zoom(1.0 / 1.2))
+				var iso := _quick_button(row, "Isometria", func():
+					if not item_mode:
+						isometric_view = not isometric_view
+						if isometric_view:
+							yaw = PI / 4.0
+							pitch = atan(1.0 / sqrt(2.0))
+						_update_camera()
+				)
+				iso.disabled = item_mode
+		1:
+			if quick_page == 1:
+				_quick_button(row, "Trocar corpo", func(): _quick_choose(scene_picker, "Personagem"))
 				_quick_button(row, "Focar", _focus_selected)
-			if not is_instance_valid(_selected_node()):
-				_refresh_quick_readout()
-				return
-			row = _quick_row()
-			quick_axis = OptionButton.new()
-			quick_axis.fit_to_longest_item = false
-			for label in ["Pos. X", "Pos. Y", "Pos. Z", "Rot. X", "Rot. Y", "Rot. Z", "Escala X", "Escala Y", "Escala Z"]:
-				quick_axis.add_item(label)
-			row.add_child(quick_axis)
-			quick_axis.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			quick_axis.item_selected.connect(func(_index): _refresh_quick_readout())
-			_quick_button(row, "−", _quick_nudge.bind(target, quick_axis, -1))
-			_quick_button(row, "+", _quick_nudge.bind(target, quick_axis, 1))
-			row = _quick_row()
-			quick_drag_button = _quick_button(row, "Arrastar eixo: não", func():
-				quick_edit_drag = not quick_edit_drag
-				quick_drag_button.text = "Arrastar eixo: sim" if quick_edit_drag else "Arrastar eixo: não"
-			)
-			_quick_button(row, "Focar", _focus_selected)
-			if target == 2:
-				_quick_button(row, "Reset", _reset_grip)
-			row = _quick_row()
-			_quick_button(row, "Escala −5%", _quick_scale.bind(target, 0.95))
-			_quick_button(row, "Escala +5%", _quick_scale.bind(target, 1.05))
-			quick_size = HSlider.new()
-			quick_size.min_value = 1.0 if target == 2 else 10.0
-			quick_size.max_value = 500.0
-			quick_size.step = 0.5
-			quick_size.custom_minimum_size.y = 36
-			quick_body.add_child(quick_size)
-			quick_size.value_changed.connect(_quick_set_size.bind(target))
-			row = _quick_row()
-			if target == 2:
-				_quick_button(row, "Salvar perfil", _save_category_grip)
+				row = _quick_row()
+				_quick_button(row, "Osso", func(): _quick_choose(contact_picker, "Osso de referência"))
+				_quick_toggle(row, "Adaptar corpo", warp_enabled)
+				row = _quick_row()
+				_quick_toggle(row, "Giro", warp_turn)
+				_quick_toggle(row, "Equilíbrio", balance_enabled)
+			else:
+				_quick_button(row, "Movimento", func(): _quick_choose(clip_picker, "Movimento"))
+				_quick_button(row, "Pausa", func(): player.pause())
+				_quick_button(row, "Play", _replay)
+				row = _quick_row()
+				_quick_button(row, "− quadro", _step_time.bind(-1))
+				_quick_button(row, "+ quadro", _step_time.bind(1))
+				_quick_toggle(row, "Loop", loop_toggle)
+				quick_time = HSlider.new()
+				quick_time.max_value = 1.0
+				quick_time.step = 0.001
+				quick_time.custom_minimum_size.y = 36
+				quick_body.add_child(quick_time)
+				quick_time.value_changed.connect(_seek_phase)
+				row = _quick_row()
+				_quick_button(row, "Anterior", func(): _step_clip(-1))
+				_quick_button(row, "Próximo", func(): _step_clip(1))
+				var speed := OptionButton.new()
+				speed.fit_to_longest_item = false
+				speed.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				for value in SPEEDS:
+					speed.add_item("%s×" % str(value))
+				speed.select(speed_picker.selected)
+				row.add_child(speed)
+				speed.item_selected.connect(_set_speed)
+		2, 3, 4:
+			if quick_page == 0:
+				if is_instance_valid(_selected_node()):
+					_quick_transform_controls(row, target)
+				elif target == 2:
+					_quick_button(row, "Escolher equipamento", func(): _quick_choose(equipment_picker, "Equipamento"))
+				elif target == 3:
+					_quick_button(row, "Escolher objeto", func(): _quick_choose(context_picker, "Objeto"))
+			elif quick_page == 1:
+				if target == 2:
+					_quick_button(row, "Trocar peça", func(): _quick_choose(equipment_picker, "Equipamento"))
+					_quick_button(row, "Trocar osso", func(): _quick_choose(bone_picker, "Osso de encaixe"))
+					row = _quick_row()
+					_quick_button(row, "Mão E" if active_slot == 0 else "Mão D", func():
+						_switch_slot(1 - active_slot)
+						_rebuild_quick_controls()
+					)
+					_quick_button(row, "Reset encaixe", _reset_grip)
+					row = _quick_row()
+					_quick_button(row, "Salvar perfil", _save_category_grip)
+					_quick_button(row, "Focar", _focus_selected)
+				elif target == 3:
+					_quick_button(row, "Trocar objeto", func(): _quick_choose(context_picker, "Objeto"))
+					_quick_button(row, "Focar", _focus_selected)
+					row = _quick_row()
+					_quick_button(row, "Zerar posição", _reset_context)
+					_quick_button(row, "Alinhar", _align_push_demo)
+				else:
+					_quick_button(row, "Trocar peça", func(): _quick_choose(item_picker, "Peça"))
+					_quick_button(row, "Focar", _focus_selected)
+					row = _quick_row()
+					_quick_button(row, "Escala original", _reset_object_scale.bind(0))
+			elif target == 2:
+				_quick_toggle(row, "IK apoio", support_enabled)
 				_quick_button(row, "Capturar apoio", _capture_support)
+				row = _quick_row()
+				_quick_button(row, "Remover apoio", _reset_support)
+				_quick_button(row, "Focar", _focus_selected)
 			elif target == 3:
-				_quick_button(row, "Capturar contato", _capture_context_ik.bind(false))
-				_quick_button(row, "Alinhar", _align_push_demo)
+				_quick_toggle(row, "IK contato", context_ik_enabled)
+				_quick_button(row, "Osso", func(): _quick_choose(contact_picker, "Osso de referência"))
+				row = _quick_row()
+				_quick_button(row, "Capturar face", _capture_context_ik.bind(false))
+				_quick_button(row, "Face superior", _capture_context_ik.bind(true))
+				row = _quick_row()
+				_quick_button(row, "Remover contato", _remove_context_ik)
 	_refresh_quick_readout()
 	_update_selection_outline()
+
+func _quick_toggle(parent: Control, title: String, source: BaseButton) -> void:
+	var button := _quick_button(parent, title, func(): source.button_pressed = not source.button_pressed)
+	button.toggle_mode = true
+	button.set_pressed_no_signal(source.button_pressed)
+	source.toggled.connect(func(enabled: bool):
+		if is_instance_valid(button):
+			button.set_pressed_no_signal(enabled)
+	)
+
+func _quick_transform_controls(row: HBoxContainer, target: int) -> void:
+	quick_axis = OptionButton.new()
+	quick_axis.fit_to_longest_item = false
+	for label in ["Pos. X", "Pos. Y", "Pos. Z", "Rot. X", "Rot. Y", "Rot. Z", "Escala X", "Escala Y", "Escala Z"]:
+		quick_axis.add_item(label)
+	row.add_child(quick_axis)
+	quick_axis.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	quick_axis.item_selected.connect(func(_index): _refresh_quick_readout())
+	_quick_button(row, "−", _quick_nudge.bind(target, quick_axis, -1))
+	_quick_button(row, "+", _quick_nudge.bind(target, quick_axis, 1))
+	row = _quick_row()
+	quick_drag_button = _quick_button(row, "Arrastar: não", func():
+		quick_edit_drag = not quick_edit_drag
+		quick_drag_button.text = "Arrastar: sim" if quick_edit_drag else "Arrastar: não"
+	)
+	_quick_button(row, "Focar", _focus_selected)
+	row = _quick_row()
+	_quick_button(row, "Escala −5%", _quick_scale.bind(target, 0.95))
+	_quick_button(row, "Escala +5%", _quick_scale.bind(target, 1.05))
+	quick_size = HSlider.new()
+	quick_size.min_value = 1.0 if target == 2 else 10.0
+	quick_size.max_value = 500.0
+	quick_size.step = 0.5
+	quick_size.custom_minimum_size.y = 36
+	quick_body.add_child(quick_size)
+	quick_size.value_changed.connect(_quick_set_size.bind(target))
 
 func _quick_set_size(percent: float, target: int) -> void:
 	if target == 2 and is_instance_valid(grip):
@@ -3419,6 +3577,19 @@ func _refresh_quick_readout() -> void:
 	elif target == 4:
 		label = Labels.item(str(items[item_index]["name"]), item_index) if item_index >= 0 else "Sem peça"
 	selected_title.text = label
+	selected_title.tooltip_text = label
+	if _quick_pages(target)[quick_page] == "Revisão":
+		quick_readout.text = "Confirme para registrar o antes/depois."
+		return
+	if target == 1 and quick_page == 1:
+		quick_readout.text = "Adaptação do corpo: " + warp_state + " · " + balance_state
+		return
+	if target == 2 and quick_page == 2:
+		quick_readout.text = support_status.text
+		return
+	if target == 3 and quick_page == 2:
+		quick_readout.text = "Contatos ativos: %d" % context_active_count
+		return
 	match target:
 		0:
 			quick_readout.text = "%s · distância %.2f m\n1 dedo: %s · 2 dedos: mover/zoom" % ["Isométrica" if isometric_view and not item_mode else "Perspectiva", distance, "mover" if camera_pan_mode else "girar"]
@@ -3537,7 +3708,7 @@ func _confirm_quick_feedback() -> void:
 	quick_notes.text = ""
 	quick_draft = true
 	quick_verdict.select(0)
-	quick_status.text = "Confirmado. %d na fila." % quick_outbox.size()
+	quick_status.text = "Confirmado · %d na fila" % quick_outbox.size()
 	if is_instance_valid(quick_token) and not quick_token.text.strip_edges().is_empty():
 		_send_quick_feedback()
 	else:
