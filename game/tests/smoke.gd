@@ -135,9 +135,10 @@ func _run() -> void:
 			push_error("Attachment bone mismatch")
 			quit(1)
 			return
+		var right_initial: Vector3 = lab.grip.position
 		lab.axis_picker.select(0)
 		lab._adjust_grip(1)
-		if not is_equal_approx(lab.grip.position.x, 0.01):
+		if not is_equal_approx(lab.grip.position.x, right_initial.x + 0.01):
 			push_error("Grip translation failed")
 			quit(1)
 			return
@@ -148,7 +149,7 @@ func _run() -> void:
 			return
 		lab.equipment_picker.item_selected.emit(0)
 		lab.equipment_picker.item_selected.emit(1)
-		if lab.grip == null or not is_equal_approx(lab.grip.position.x, 0.01):
+		if lab.grip == null or not is_equal_approx(lab.grip.position.x, right_initial.x + 0.01):
 			push_error("Grip calibration restore failed")
 			quit(1)
 			return
@@ -170,10 +171,11 @@ func _run() -> void:
 			push_error("Independent slots failed")
 			quit(1)
 			return
+		var left_initial: Vector3 = lab.grip.position
 		lab.axis_picker.select(1)
 		lab._adjust_grip(1)
 		lab._switch_slot(0)
-		if lab.attachment != right_attachment or not is_equal_approx(lab.grip.position.x, 0.01) or not is_equal_approx(lab.grip.position.y, 0.0):
+		if lab.attachment != right_attachment or not is_equal_approx(lab.grip.position.x, right_initial.x + 0.01) or not is_equal_approx(lab.grip.position.y, right_initial.y):
 			push_error("Independent slot calibration failed")
 			quit(1)
 			return
@@ -182,8 +184,10 @@ func _run() -> void:
 			push_error("Dual equipment not retained on animation switch")
 			quit(1)
 			return
+		var scale_anchor: Vector3 = lab.grip.get_meta("fit_anchor", Vector3.ZERO)
+		var contact_before: Vector3 = lab.grip.transform * scale_anchor
 		lab._set_equipped_scale(125.0)
-		if not lab.grip.scale.is_equal_approx(Vector3.ONE * 1.25):
+		if not lab.grip.scale.is_equal_approx(Vector3.ONE * 1.25) or not (lab.grip.transform * scale_anchor).is_equal_approx(contact_before):
 			push_error("Equipped object scale failed")
 			quit(1)
 			return
@@ -194,7 +198,7 @@ func _run() -> void:
 			quit(1)
 			return
 		lab._switch_slot(1)
-		if lab.attachment != left_attachment or not is_equal_approx(lab.grip.position.y, 0.01):
+		if lab.attachment != left_attachment or not is_equal_approx(lab.grip.position.y, left_initial.y + 0.01):
 			push_error("Other slot lost after removal")
 			quit(1)
 			return
@@ -415,7 +419,7 @@ func _run() -> void:
 	# Programmatic assignment does not guarantee TextEdit.text_changed; mirror explicit UI save.
 	lab._save_reviews()
 	var report: Variant = JSON.parse_string(lab._report_json())
-	if not report is Dictionary or report["reviews"].size() != 1 or report["reviews"][0]["notes"] != "Teste de encaixe: mão esquerda" or report["current"]["notes"] != "Observação atual" or report["build"] != "0.1.0-alpha.21" or not report["current"].has("demo") or not report["current"].has("balance") or not report["current"]["bodyWarp"].has("yawDeg") or not report["current"]["contextIK"].has("contacts") or not report["current"].has("bodyWarp") or not report.has("bodyWarpProfiles") or not report["current"].has("contextIK") or not report.has("contextContactProfiles") or not report["current"].has("supportIK") or not report.has("supportProfiles"):
+	if not report is Dictionary or report["reviews"].size() != 1 or report["reviews"][0]["notes"] != "Teste de encaixe: mão esquerda" or report["current"]["notes"] != "Observação atual" or report["build"] != "0.1.0-alpha.22" or not report["current"].has("demo") or not report["current"].has("balance") or not report["current"]["bodyWarp"].has("yawDeg") or not report["current"]["contextIK"].has("contacts") or not report["current"].has("bodyWarp") or not report.has("bodyWarpProfiles") or not report["current"].has("contextIK") or not report.has("contextContactProfiles") or not report["current"].has("supportIK") or not report.has("supportProfiles"):
 		push_error("Review JSON failed")
 		quit(1)
 		return
@@ -478,6 +482,10 @@ func _run() -> void:
 		quit(1)
 		return
 	print("BALANCE_OK: projection, support margin, axis and correction limits.")
+	if not _test_equipment_fit():
+		push_error("Equipment geometry fitting failed")
+		quit(1)
+		return
 	if not _test_demo_samples(lab):
 		push_error("Demo sample attachment/context failed")
 		quit(1)
@@ -686,3 +694,22 @@ func _test_gallery(lab) -> bool:
 			break
 	var p: Vector3 = demos.face_position(Vector3(0.2, 1, -0.6), Vector3(0, 1, 0), Vector3(0.3, 0.5, 0.4))
 	return found and p.is_equal_approx(Vector3(0.2, 0, -1.0))
+
+func _test_equipment_fit() -> bool:
+	var rules = preload("res://lab/equipment_rules.gd")
+	var bounds := AABB(Vector3(-0.57, -0.82, -0.13), Vector3(1.14, 5.45, 0.26))
+	var hand := {"center": Vector3(0.05, 0.02, 0.0), "basis": Basis(Vector3.FORWARD, 0.4)}
+	var data: Dictionary = rules.fit({"pack": "medieval_weapons_pack", "name": "Sword"}, bounds, 1.75, 1.0, hand)
+	if data.is_empty():
+		return false
+	var transform: Transform3D = data["transform"]
+	var anchor: Vector3 = data["anchor"]
+	if not is_equal_approx(transform.basis.get_scale().y * bounds.size.y, 0.90):
+		return false
+	if not (transform * anchor).is_equal_approx(hand["center"]):
+		return false
+	var small: Dictionary = rules.fit({"pack": "medieval_weapons_pack", "name": "Sword"}, bounds, 0.875, 2.0, hand)
+	if not is_equal_approx(float(small["scale"]) * 2.0 * bounds.size.y, 0.45):
+		return false
+	print("EQUIPMENT_FIT_OK: scale relative to actor and parent; anchor preserved under fit.")
+	return true

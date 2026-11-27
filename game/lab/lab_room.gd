@@ -75,6 +75,7 @@ var review_path := "user://lab-reviews-v1.json"
 var review_dialog: FileDialog
 var export_payload := ""
 var grip_source := ""
+var actor_height_m := 1.75
 ## Single-room inspector. Real imported scenes only; no synthetic character or clip.
 var records: Array = []
 var actor: Node3D
@@ -183,6 +184,7 @@ var item_base_size := Vector3.ZERO
 var item_pivot: Node3D
 var equipped_scale_slider: HSlider
 var equipped_scale_label: Label
+const MIN_EQUIPMENT_SCALE := 0.01
 const MIN_OBJECT_SCALE := 0.1
 const MAX_OBJECT_SCALE := 5.0
 
@@ -535,9 +537,9 @@ func _create_ui() -> void:
 	equipped_scale_label.text = "Tamanho do equipamento: 100%"
 	equipment_controls.add_child(equipped_scale_label)
 	equipped_scale_slider = HSlider.new()
-	equipped_scale_slider.min_value = MIN_OBJECT_SCALE * 100.0
+	equipped_scale_slider.min_value = MIN_EQUIPMENT_SCALE * 100.0
 	equipped_scale_slider.max_value = MAX_OBJECT_SCALE * 100.0
-	equipped_scale_slider.step = 5.0
+	equipped_scale_slider.step = 0.5
 	equipped_scale_slider.value = 100
 	equipped_scale_slider.custom_minimum_size.y = 60
 	equipment_controls.add_child(equipped_scale_slider)
@@ -995,7 +997,10 @@ func _apply_item_scale(reframe: bool) -> void:
 func _set_equipped_scale(percent: float) -> void:
 	if not is_instance_valid(grip):
 		return
-	grip.scale = Vector3.ONE * clampf(percent / 100.0, MIN_OBJECT_SCALE, MAX_OBJECT_SCALE)
+	var anchor: Vector3 = grip.get_meta("fit_anchor", Vector3.ZERO)
+	var contact := grip.transform * anchor
+	grip.scale = Vector3.ONE * clampf(percent / 100.0, MIN_EQUIPMENT_SCALE, MAX_OBJECT_SCALE)
+	grip.position += contact - grip.transform * anchor
 	grip_source = "manual"
 	grip_profiles[active_profile] = grip.transform
 	_save_grip_profiles()
@@ -1007,7 +1012,7 @@ func _refresh_equipped_scale() -> void:
 	equipped_scale_slider.editable = is_instance_valid(grip)
 	var percent := grip.scale.x * 100.0 if is_instance_valid(grip) else 100.0
 	equipped_scale_slider.set_value_no_signal(percent)
-	equipped_scale_label.text = "Tamanho do equipamento: %.0f%%" % percent
+	equipped_scale_label.text = "Escala do modelo: %.1f%%" % percent
 
 func _load_scene(index: int) -> void:
 	_clear_context_solvers()
@@ -1051,6 +1056,15 @@ func _load_scene(index: int) -> void:
 	warp_root.name = "AdaptiveRoot"
 	add_child(warp_root)
 	warp_root.add_child(actor)
+	var actor_boxes: Array[AABB] = []
+	_collect_bounds(actor, actor_boxes)
+	actor_height_m = 1.75
+	if not actor_boxes.is_empty():
+		var actor_box := actor_boxes[0]
+		for i in range(1, actor_boxes.size()):
+			actor_box = actor_box.merge(actor_boxes[i])
+		if actor_box.size.y > 0.05 and actor_box.size.y < 20.0:
+			actor_height_m = actor_box.size.y
 	skeleton = _find_skeleton(actor)
 	_populate_bones()
 	equipment_toggle.disabled = equipment_indices.is_empty() or not is_instance_valid(skeleton)
@@ -1607,6 +1621,15 @@ func _category_key() -> String:
 func _apply_grip_default() -> void:
 	grip.transform = Transform3D.IDENTITY
 	grip_source = "pivot_unverified"
+	var record: Dictionary = items[equipped_index]
+	var bone_id := skeleton.find_bone(attachment.bone_name)
+	var hand := EquipmentRules.hand_frame(skeleton, bone_id) if bone_id in hand_bones else {}
+	var parent_scale := (skeleton.global_transform * skeleton.get_bone_global_pose(bone_id)).basis.get_scale().abs()
+	var unit_scale := (parent_scale.x + parent_scale.y + parent_scale.z) / 3.0
+	var bounds := EquipmentRules.model_bounds(grip)
+	var fit := EquipmentRules.fit(record, bounds, actor_height_m, unit_scale, hand)
+	grip.set_meta("fit_anchor", fit.get("anchor", Vector3.ZERO))
+	grip.set_meta("fit_target_m", fit.get("target_m", 0.0))
 	if grip_profiles.has(active_profile):
 		grip.transform = grip_profiles[active_profile]
 		grip_source = "manual"
@@ -1615,13 +1638,22 @@ func _apply_grip_default() -> void:
 	if is_instance_valid(marker):
 		var local := grip.global_transform.affine_inverse() * marker.global_transform
 		if local.is_finite() and absf(local.basis.determinant()) > 0.000001:
-			grip.transform = local.affine_inverse()
+			var factor: float = fit.get("scale", 1.0)
+			var rotation := local.basis.orthonormalized().inverse() * factor
+			var palm: Vector3 = hand.get("center", Vector3.ZERO)
+			grip.transform = Transform3D(rotation, palm - rotation * local.origin)
+			grip.set_meta("fit_anchor", local.origin)
 			grip_source = "asset_marker_unverified"
 			return
 	var key := _category_key()
 	if category_profiles.has(key):
 		grip.transform = category_profiles[key]
 		grip_source = "category_unverified"
+		return
+	if not fit.is_empty():
+		grip.transform = fit["transform"]
+		grip_source = str(fit["source"])
+
 
 func _save_category_grip() -> void:
 	if not is_instance_valid(grip) or equipped_index < 0:
@@ -1717,7 +1749,7 @@ func _snapshot() -> Dictionary:
 		var node: Node3D = grip if slot == active_slot else state.get("grip")
 		var attached: BoneAttachment3D = attachment if slot == active_slot else state.get("attachment")
 		if idx >= 0 and is_instance_valid(node) and is_instance_valid(attached):
-			equipped.append({"slot": slot, "itemId": items[idx]["id"], "category": EquipmentRules.category(str(items[idx]["name"])), "bone": str(attached.bone_name), "gripSource": grip_source if slot == active_slot else state.get("source", ""), "transform": _tjson(node.transform)})
+			equipped.append({"slot": slot, "itemId": items[idx]["id"], "category": EquipmentRules.category(str(items[idx]["name"])), "bone": str(attached.bone_name), "gripSource": grip_source if slot == active_slot else state.get("source", ""), "transform": _tjson(node.transform), "fitAnchorLocal": _vjson(node.get_meta("fit_anchor", Vector3.ZERO)), "fitTargetMeters": node.get_meta("fit_target_m", 0.0)})
 	var t := player.current_animation_position if is_instance_valid(player) else 0.0
 	var length := _clip_length()
 	return {"mode": "item" if item_mode else "actor", "sceneId": records[scene_picker.selected]["id"] if scene_picker.selected >= 0 and scene_picker.selected < records.size() else "", "clipId": str(selected_clip), "timeSeconds": t, "durationSeconds": length, "phase": t / length if length > 0.0 else 0.0, "loop": loop_toggle.button_pressed, "speed": playback_speed, "playing": is_instance_valid(player) and player.is_playing(), "equipment": equipped, "activeSlot": active_slot, "itemId": items[item_index]["id"] if item_index >= 0 and item_index < items.size() else "", "contextId": items[context_record_index]["id"] if context_record_index >= 0 else "", "contextOffset": _vjson(context_offset), "contactBone": str(skeleton.get_bone_name(contact_picker.get_selected_id())) if is_instance_valid(skeleton) and contact_picker.selected >= 0 else "", "camera": {"yaw": yaw, "pitch": pitch, "distance": distance, "focus": _vjson(focus)}, "menuTransparency": menu_transparency, "compatibleOnly": compatible_only.button_pressed, "autoAction": auto_action.button_pressed}

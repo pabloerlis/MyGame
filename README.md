@@ -2,7 +2,9 @@
 
 RPG 3D de ação, sobrevivência, exploração e progressão, com identidade própria e estética low-poly de fantasia. PC como plataforma-alvo do jogo final; Android como plataforma exclusiva de testes e entregas da etapa de laboratório; experiência offline; ferramentas e assets gratuitos. O projeto inicia pelo laboratório de validação, não pelo mundo do jogo.
 
-## Estado: 0.1.0-alpha.21 — galeria de demonstrações e capturas reais (CI pendente)
+## Estado: 0.1.0-alpha.22 — proporção e empunhadura inicial por geometria (CI pendente)
+
+Normalização uniforme por categoria em função da altura do ator e escala do osso. Seis modelos de demonstração com pontos iniciais inferidos dos limites reais dos GLBs; alinhamento com referências dos dedos quando disponíveis. Ajustes manuais persistidos continuam prioritários; Redefinir reaplica a nova proposta. Valores de referência e encaixes ainda não aprovados visualmente.
 
 Botão Amostras na sala, seleção direta pesquisável entre bibliotecas, câmera próxima de equipamento, alinhamento aproximado de caixote a mãos em pose de empurrar. CI gera imagens PNG reais e manifesto das poses, sem declarar aprovação visual. Alpha.20 aprovada e publicada.
 
