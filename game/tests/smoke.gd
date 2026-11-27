@@ -412,7 +412,7 @@ func _run() -> void:
 	# Programmatic assignment does not guarantee TextEdit.text_changed; mirror explicit UI save.
 	lab._save_reviews()
 	var report: Variant = JSON.parse_string(lab._report_json())
-	if not report is Dictionary or report["reviews"].size() != 1 or report["reviews"][0]["notes"] != "Teste de encaixe: mão esquerda" or report["current"]["notes"] != "Observação atual" or report["build"] != "0.1.0-alpha.13" or not report["current"].has("supportIK") or not report.has("supportProfiles"):
+	if not report is Dictionary or report["reviews"].size() != 1 or report["reviews"][0]["notes"] != "Teste de encaixe: mão esquerda" or report["current"]["notes"] != "Observação atual" or report["build"] != "0.1.0-alpha.14" or not report["current"].has("supportIK") or not report.has("supportProfiles"):
 		push_error("Review JSON failed")
 		quit(1)
 		return
@@ -429,6 +429,11 @@ func _run() -> void:
 		quit(1)
 		return
 	print("SUPPORT_IK_OK: reachable target, scale and unreachable rejection.")
+	if not await _test_renik():
+		push_error("RenIK backend integration failed")
+		quit(1)
+		return
+	print("RENIK_OK: backend selection, finite result, reach rejection and axis guard.")
 	quit(0)
 
 func _test_support_ik() -> bool:
@@ -450,6 +455,36 @@ func _test_support_ik() -> bool:
 	ok = ok and solver.state == "out_of_reach" and not solver.ik.is_running()
 	ok = ok and solver.reachable(Vector3.ZERO, Vector3(0.3, 0, 0), Vector3(0.6, 0, 0), Vector3(0.4, 0.1, 0))
 	ok = ok and not solver.reachable(Vector3.ZERO, Vector3(0.3, 0, 0), Vector3(0.6, 0, 0), Vector3(0.8, 0, 0))
+	solver.clear()
+	rig.queue_free()
+	return ok
+
+func _test_renik() -> bool:
+	var solver = preload("res://lab/contact_ik.gd").new()
+	var rig := Skeleton3D.new()
+	root.add_child(rig)
+	for bone in ["Root", "LeftUpperArm", "LeftLowerArm", "LeftHand"]:
+		rig.add_bone(bone)
+	for i in range(1, 4):
+		rig.set_bone_parent(i, i - 1)
+		rig.set_bone_rest(i, Transform3D(Basis.IDENTITY, Vector3(0, 0.3, 0) if i > 1 else Vector3.ZERO))
+	rig.reset_bone_poses()
+	solver.select_backend("renik")
+	var goal := Vector3(0.25, 0.35, 0.1)
+	solver.apply(rig, 3, goal, 1.0)
+	for i in range(5):
+		await process_frame
+	var ok: bool = solver.state == "active" and solver.samples > 0 and solver.after_cm >= 0.0 and is_finite(solver.after_cm)
+	print("RenIK synthetic error cm: ", solver.before_cm, " -> ", solver.after_cm)
+	solver.apply(rig, 3, Vector3(5, 0, 0), 1.0)
+	ok = ok and solver.state == "out_of_reach" and not solver.renik.active
+	solver.select_backend("godot_fabrik")
+	ok = ok and solver.renik == null and solver.backend == "godot_fabrik"
+	solver.select_backend("renik")
+	rig.set_bone_rest(2, Transform3D(Basis.IDENTITY, Vector3(0.3, 0, 0)))
+	rig.reset_bone_poses()
+	solver.apply(rig, 3, Vector3(0.2, 0.3, 0.1), 1.0)
+	ok = ok and solver.state == "renik_rig_incompatible" and not solver.renik.active
 	solver.clear()
 	rig.queue_free()
 	return ok

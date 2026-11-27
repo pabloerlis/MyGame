@@ -4,6 +4,7 @@ const EquipmentRules = preload("res://lab/equipment_rules.gd")
 const ContactIK = preload("res://lab/contact_ik.gd")
 var support_solver = ContactIK.new()
 var support_enabled: CheckButton
+var support_backend: OptionButton
 var support_status: Label
 var support_axis: OptionButton
 var support_profiles := {}
@@ -1694,6 +1695,11 @@ func _create_support_ui(parent: VBoxContainer) -> void:
 	support_enabled.text = "Corrigir mão livre automaticamente"
 	parent.add_child(support_enabled)
 	support_enabled.toggled.connect(func(_enabled): _update_support())
+	support_backend = OptionButton.new()
+	support_backend.add_item("Godot FABRIK (padrão)")
+	support_backend.add_item("RenIK (experimental)")
+	_long_picker(parent, "Algoritmo de contato", support_backend)
+	support_backend.item_selected.connect(_select_support_backend)
 	var capture := Button.new()
 	capture.text = "Capturar mão livre nesta pose"
 	parent.add_child(capture)
@@ -1717,6 +1723,10 @@ func _create_support_ui(parent: VBoxContainer) -> void:
 	support_status = Label.new()
 	support_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	parent.add_child(support_status)
+
+func _select_support_backend(index: int) -> void:
+	support_solver.select_backend("renik" if index == 1 else "godot_fabrik")
+	_update_support()
 
 func _load_support_profiles() -> void:
 	var cfg := ConfigFile.new()
@@ -1828,7 +1838,9 @@ func _update_support() -> void:
 	if support_solver.state == "out_of_reach":
 		support_status.text = "Alvo fora do alcance: %.1f cm da mão. Correção suspensa." % support_solver.before_cm
 	elif support_solver.state == "active":
-		support_status.text = "IK experimental | erro original %.1f cm | corrigido %s" % [support_solver.before_cm, ("%.1f cm" % support_solver.after_cm) if support_solver.after_cm >= 0.0 else "medindo"]
+		support_status.text = "%s | erro original %.1f cm | corrigido %s" % ["RenIK" if support_solver.backend == "renik" else "FABRIK", support_solver.before_cm, ("%.1f cm" % support_solver.after_cm) if support_solver.after_cm >= 0.0 else "medindo"]
+	elif support_solver.state == "renik_rig_incompatible":
+		support_status.text = "RenIK requer adaptação do eixo dos ossos deste rig. Use FABRIK."
 	else:
 		support_status.text = "Rig não suportado."
 
@@ -1852,7 +1864,7 @@ func _show_support_marker(show: bool, goal: Vector3 = Vector3.ZERO) -> void:
 	support_marker.show()
 
 func _support_snapshot() -> Dictionary:
-	return {"enabled": support_enabled.button_pressed, "backend": "godot_fabrik", "state": support_solver.state, "profile": support_key, "source": support_source, "beforeCm": support_solver.before_cm, "afterCm": support_solver.after_cm}
+	return {"enabled": support_enabled.button_pressed, "backend": support_solver.backend, "samples": support_solver.samples, "state": support_solver.state, "profile": support_key, "source": support_source, "beforeCm": support_solver.before_cm, "afterCm": support_solver.after_cm}
 
 func _support_export_profiles() -> Dictionary:
 	var out := {}

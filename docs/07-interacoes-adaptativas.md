@@ -20,3 +20,6 @@ RenIK é port GDScript; compatibilidade 4.4.1 não demonstrada. AMSG é componen
 
 ## alpha.13 — primeiro adaptador funcional (CI pendente)
 Optado pelo SkeletonIK3D/FABRIK nativo como baseline do Godot 4.4.1, para reduzir risco de API e medir ganho antes de trocar o backend. Mão livre recebe alvo local da peça (marcador explícito ou captura de pose); opção desligada por padrão, por clipe/rig/peça, edição em cm, rejeição por alcance, erro antes/depois e exportação de perfis. A rotação da mão, dedos, colisão fina, janelas de contato e warping não estão resolvidos. RenIK e AMSG continuam arquivados, não ativados. Smoke inclui cadeia sintética; não equivale a aprovação física ou visual do Android.
+
+## alpha.14 — RenIK selecionável (CI pendente)
+Cópia do módulo de membros/helper MIT em game/addons/renik, licença incluída. Preservados originais. Backend padrão FABRIK; RenIK usa target no mundo e orientação de entrada, sem movimento de ombro nem estiramento. Guardas de eixo +Y e cadeia direta: rigs incompatíveis permanecem no FABRIK até adaptação explícita. Teste sintético mede erro e rejeita alvos impossíveis; não prova precisão em rigs reais. JSON registra backend e amostras. AMSG continua arquivado. Não trocar engine.
