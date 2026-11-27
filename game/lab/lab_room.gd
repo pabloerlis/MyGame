@@ -531,9 +531,11 @@ func _section_heading(parent: VBoxContainer, title: String, subtitle: String) ->
 	parent.add_child(hint)
 
 func _set_settings(open: bool) -> void:
+	var was_open := settings_open
 	settings_open = open
 	if not open:
-		_save_menu_preferences()
+		if was_open:
+			_save_menu_preferences()
 		_close_choices()
 	touches.clear()
 	catalog_panel.visible = open
