@@ -20,12 +20,16 @@ static func chain(skeleton: Skeleton3D, hand: int) -> PackedInt32Array:
 		return PackedInt32Array()
 	var lower := -1
 	var upper := -1
+	var tip_name := str(skeleton.get_bone_name(hand)).to_lower()
+	var foot := "foot" in tip_name
 	var cursor := skeleton.get_bone_parent(hand)
 	while cursor >= 0:
 		var n := str(skeleton.get_bone_name(cursor)).to_lower().replace("_", "").replace(".", "").replace("-", "")
-		if lower < 0 and ("lowerarm" in n or "forearm" in n):
+		var lower_match := ("lowerleg" in n or "calf" in n or ("leg" in n and not "upperleg" in n and not "upleg" in n)) if foot else ("lowerarm" in n or "forearm" in n)
+		var upper_match := ("upperleg" in n or "upleg" in n or "thigh" in n) if foot else ("upperarm" in n or ("arm" in n and not "forearm" in n and not "lowerarm" in n))
+		if lower < 0 and lower_match:
 			lower = cursor
-		elif lower >= 0 and ("upperarm" in n or ("arm" in n and not "forearm" in n and not "lowerarm" in n)):
+		elif lower >= 0 and upper_match:
 			upper = cursor
 			break
 		cursor = skeleton.get_bone_parent(cursor)

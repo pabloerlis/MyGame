@@ -3,6 +3,16 @@ const Labels = preload("res://lab/labels_pt.gd")
 const EquipmentRules = preload("res://lab/equipment_rules.gd")
 const ContactIK = preload("res://lab/contact_ik.gd")
 var support_solver = ContactIK.new()
+const ContextGeometry = preload("res://lab/context_contact.gd")
+var context_solver = ContactIK.new()
+var context_ik_enabled: CheckButton
+var context_ik_span: HSlider
+var context_ik_label: Label
+var context_ik_profiles := {}
+var context_ik_path := "user://context-contacts-v1.cfg"
+var context_ik_marker: MeshInstance3D
+var context_ik_key := ""
+var context_ik_weight := 0.0
 var support_enabled: CheckButton
 var support_backend: OptionButton
 var support_status: Label
@@ -164,6 +174,7 @@ func _ready() -> void:
 	_load_menu_preferences()
 	_load_grip_profiles()
 	_load_support_profiles()
+	_load_context_ik_profiles()
 	_load_reviews()
 	var file := FileAccess.open("res://assets/runtime/catalog.json", FileAccess.READ)
 	if file == null:
@@ -512,6 +523,7 @@ func _create_ui() -> void:
 	contact_label = Label.new()
 	contact_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	inspection_controls.add_child(contact_label)
+	_create_context_ik_ui(inspection_controls)
 	details = Label.new()
 	details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	panel.add_child(details)
@@ -914,6 +926,7 @@ func _refresh_equipped_scale() -> void:
 	equipped_scale_label.text = "Tamanho do equipamento: %.0f%%" % percent
 
 func _load_scene(index: int) -> void:
+	context_solver.clear()
 	support_solver.clear()
 	_clear_all_equipment()
 	skeleton = null
@@ -1389,6 +1402,7 @@ func _replay() -> void:
 	details.text = "%s | %.2f s | %d trilhas" % [Labels.clip(str(selected_clip), clip_index), animation.length, animation.get_track_count()]
 
 func _process(delta: float) -> void:
+	_update_context_ik()
 	_update_support()
 	diagnostics_elapsed += delta
 	if diagnostics_elapsed >= 0.10:
@@ -1613,6 +1627,7 @@ func _snapshot() -> Dictionary:
 func _review_entry() -> Dictionary:
 	var entry := _snapshot()
 	entry["supportIK"] = _support_snapshot()
+	entry["contextIK"] = _context_ik_snapshot()
 	entry["notes"] = review_notes.text
 	entry["build"] = ProjectSettings.get_setting("application/config/version")
 	entry["itemScale"] = _vjson(_object_scale(item_index))
@@ -1660,7 +1675,7 @@ func _report_json() -> String:
 	for index in object_scales:
 		if int(index) >= 0 and int(index) < items.size():
 			scales[items[int(index)]["id"]] = _vjson(object_scales[index])
-	return JSON.stringify({"schemaVersion": 1, "build": ProjectSettings.get_setting("application/config/version"), "exportedAt": Time.get_datetime_string_from_system(true) + "Z", "current": _review_entry(), "reviews": review_records, "gripProfiles": profiles, "categoryProfiles": categories, "objectScales": scales, "supportProfiles": _support_export_profiles()}, "\t")
+	return JSON.stringify({"schemaVersion": 1, "build": ProjectSettings.get_setting("application/config/version"), "exportedAt": Time.get_datetime_string_from_system(true) + "Z", "current": _review_entry(), "reviews": review_records, "gripProfiles": profiles, "categoryProfiles": categories, "objectScales": scales, "supportProfiles": _support_export_profiles(), "contextContactProfiles": _context_ik_export()}, "\t")
 
 func _write_export_file(path: String) -> void:
 	var file := FileAccess.open(path, FileAccess.WRITE)
@@ -1813,6 +1828,11 @@ func _reset_support() -> void:
 func _update_support() -> void:
 	if not is_instance_valid(support_enabled):
 		return
+	if context_solver.state == "active":
+		support_solver.suspend("context_priority")
+		support_status.text = "Pausa durante o contato com objeto de contexto."
+		_show_support_marker(false)
+		return
 	var data := _support_data()
 	support_key = ""
 	support_source = ""
@@ -1871,3 +1891,179 @@ func _support_export_profiles() -> Dictionary:
 	for key in support_profiles:
 		out[key] = _vjson(support_profiles[key])
 	return out
+
+func _create_context_ik_ui(parent: VBoxContainer) -> void:
+	_section_heading(parent, "Contato adaptativo (experimental)", "Escolha mão ou pé no osso de referência. Pause na fase de contato e capture uma superfície do objeto.")
+	context_ik_enabled = CheckButton.new()
+	context_ik_enabled.text = "Corrigir contato durante a fase"
+	parent.add_child(context_ik_enabled)
+	context_ik_enabled.toggled.connect(func(_value): _update_context_ik())
+	var nearest := Button.new()
+	nearest.text = "Capturar superfície mais próxima"
+	parent.add_child(nearest)
+	nearest.pressed.connect(_capture_context_ik.bind(false))
+	var top := Button.new()
+	top.text = "Capturar face superior (apoio)"
+	parent.add_child(top)
+	top.pressed.connect(_capture_context_ik.bind(true))
+	var span_label := Label.new()
+	span_label.text = "Janela de contato: 30% do clipe"
+	parent.add_child(span_label)
+	context_ik_span = HSlider.new()
+	context_ik_span.min_value = 10
+	context_ik_span.max_value = 100
+	context_ik_span.step = 5
+	context_ik_span.value = 30
+	context_ik_span.custom_minimum_size.y = 64
+	parent.add_child(context_ik_span)
+	context_ik_span.value_changed.connect(func(value: float):
+		span_label.text = "Janela de contato: %.0f%% do clipe" % value
+		var data := _context_ik_data()
+		var key := str(data.get("key", ""))
+		if context_ik_profiles.has(key):
+			var profile: Dictionary = context_ik_profiles[key]
+			profile["span"] = value / 100.0
+			_save_context_ik_profiles()
+	)
+	var remove := Button.new()
+	remove.text = "Remover contato registrado"
+	parent.add_child(remove)
+	remove.pressed.connect(_remove_context_ik)
+	context_ik_label = Label.new()
+	context_ik_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	parent.add_child(context_ik_label)
+
+func _context_ik_data() -> Dictionary:
+	if item_mode or not is_instance_valid(skeleton) or not is_instance_valid(context_root) or context_root.get_child_count() < 2 or contact_picker.selected < 0:
+		return {}
+	var bone := contact_picker.get_selected_id()
+	if bone < 0 or bone >= skeleton.get_bone_count():
+		return {}
+	var name := str(skeleton.get_bone_name(bone))
+	if ("hand" not in name.to_lower() and "foot" not in name.to_lower()) or ContactIK.chain(skeleton, bone).size() != 3:
+		return {}
+	# Do not solve an equipped limb to an unrelated context surface.
+	for slot in [0, 1]:
+		var state: Dictionary = slot_states.get(slot, {})
+		var attached: BoneAttachment3D = attachment if slot == active_slot else state.get("attachment")
+		if is_instance_valid(attached) and attached.bone_name == name:
+			return {}
+	var body := context_root.get_child(1) as StaticBody3D
+	if body == null or body.get_child_count() == 0:
+		return {}
+	var collision := body.get_child(0) as CollisionShape3D
+	if collision == null or not collision.shape is BoxShape3D:
+		return {}
+	var box := collision.shape as BoxShape3D
+	var key := "%s|%s|%s|%s" % [records[scene_picker.selected]["id"], items[context_record_index]["id"], selected_clip, name]
+	return {"bone": bone, "shape": collision, "half": box.size * 0.5, "key": key}
+
+func _context_ik_phase() -> float:
+	var length := _clip_length()
+	if length <= 0.0:
+		return 0.0
+	return clampf(player.current_animation_position / length, 0.0, 1.0)
+
+func _capture_context_ik(top: bool) -> void:
+	var data := _context_ik_data()
+	if data.is_empty():
+		return
+	context_solver.suspend("calibration")
+	support_solver.suspend("calibration")
+	var collision: CollisionShape3D = data["shape"]
+	var half: Vector3 = data["half"]
+	var bone: int = data["bone"]
+	var local := collision.to_local(skeleton.to_global(skeleton.get_bone_global_pose(bone).origin))
+	var anchor := ContextGeometry.top_surface(local, half) if top else ContextGeometry.nearest_surface(local, half)
+	context_ik_profiles[str(data["key"])] = {"anchor": anchor, "phase": _context_ik_phase(), "span": context_ik_span.value / 100.0, "surface": "top_box" if top else "nearest_box"}
+	_save_context_ik_profiles()
+	_update_context_ik()
+
+func _remove_context_ik() -> void:
+	var data := _context_ik_data()
+	if not data.is_empty():
+		context_ik_profiles.erase(str(data["key"]))
+		_save_context_ik_profiles()
+	_update_context_ik()
+
+func _update_context_ik() -> void:
+	if not is_instance_valid(context_ik_enabled):
+		return
+	context_ik_weight = 0.0
+	context_ik_key = ""
+	if is_instance_valid(context_ik_marker):
+		context_ik_marker.hide()
+	if not context_ik_enabled.button_pressed:
+		context_solver.suspend("disabled")
+		context_ik_label.text = "Correção desativada."
+		return
+	var data := _context_ik_data()
+	if data.is_empty():
+		context_solver.suspend("no_context")
+		context_ik_label.text = "Escolha um objeto e uma mão ou pé livre compatível."
+		return
+	context_ik_key = str(data["key"])
+	if not context_ik_profiles.has(context_ik_key):
+		context_solver.suspend("no_anchor")
+		context_ik_label.text = "Capture uma superfície na fase de contato."
+		return
+	var profile: Dictionary = context_ik_profiles[context_ik_key]
+	var collision: CollisionShape3D = data["shape"]
+	var half: Vector3 = data["half"]
+	var anchor: Vector3 = profile["anchor"]
+	var goal := collision.to_global(anchor * half)
+	_show_context_ik_marker(goal)
+	context_ik_weight = ContextGeometry.phase_weight(_context_ik_phase(), float(profile["phase"]), float(profile["span"]))
+	if context_ik_weight <= 0.001:
+		context_solver.suspend("outside_phase")
+		context_ik_label.text = "Fora da janela de contato."
+		return
+	support_solver.suspend("context_priority")
+	context_solver.apply(skeleton, int(data["bone"]), goal, context_ik_weight)
+	if context_solver.state == "active":
+		context_ik_label.text = "Caixa aproximada | influência %.0f%% | erro %.1f → %s cm" % [context_ik_weight * 100.0, context_solver.before_cm, "%.1f" % context_solver.after_cm if context_solver.after_cm >= 0.0 else "medindo"]
+	elif context_solver.state == "out_of_reach":
+		context_ik_label.text = "Superfície fora do alcance; correção suspensa."
+	else:
+		context_ik_label.text = "Rig não suportado."
+
+func _show_context_ik_marker(goal: Vector3) -> void:
+	if not is_instance_valid(context_ik_marker):
+		context_ik_marker = MeshInstance3D.new()
+		var sphere := SphereMesh.new()
+		sphere.radius = 0.018
+		sphere.height = 0.036
+		context_ik_marker.mesh = sphere
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = Color(1.0, 0.65, 0.1)
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		context_ik_marker.material_override = mat
+		add_child(context_ik_marker)
+	context_ik_marker.global_position = goal
+	context_ik_marker.show()
+
+func _save_context_ik_profiles() -> void:
+	var cfg := ConfigFile.new()
+	for key in context_ik_profiles:
+		cfg.set_value("contacts", key, context_ik_profiles[key])
+	cfg.save(context_ik_path)
+
+func _load_context_ik_profiles() -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load(context_ik_path) != OK or not cfg.has_section("contacts"):
+		return
+	for key in cfg.get_section_keys("contacts"):
+		var p: Variant = cfg.get_value("contacts", key)
+		if p is Dictionary and p.get("anchor") is Vector3 and p["anchor"].is_finite() and p.has("phase") and p.has("span"):
+			context_ik_profiles[key] = p
+
+func _context_ik_snapshot() -> Dictionary:
+	return {"enabled": context_ik_enabled.button_pressed, "profile": context_ik_key, "backend": "godot_fabrik", "state": context_solver.state, "weight": context_ik_weight, "beforeCm": context_solver.before_cm, "afterCm": context_solver.after_cm}
+
+func _context_ik_export() -> Dictionary:
+	var result := {}
+	for key in context_ik_profiles:
+		var p: Dictionary = context_ik_profiles[key].duplicate()
+		p["anchor"] = _vjson(p["anchor"])
+		result[key] = p
+	return result

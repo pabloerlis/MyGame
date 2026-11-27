@@ -2,7 +2,9 @@
 
 RPG 3D de ação, sobrevivência, exploração e progressão, com identidade própria e estética low-poly de fantasia. PC como plataforma-alvo do jogo final; Android como plataforma exclusiva de testes e entregas da etapa de laboratório; experiência offline; ferramentas e assets gratuitos. O projeto inicia pelo laboratório de validação, não pelo mundo do jogo.
 
-## Estado: 0.1.0-alpha.14 — seleção de backend IK (CI pendente)
+## Estado: 0.1.0-alpha.15 — contato contextual por fase (CI pendente)
+
+Captura de superfície aproximada para mão/pé livre, anchor normalizado que acompanha a escala do objeto, janela temporal com transição suave, prioridade sobre IK de apoio e perfis persistentes exportáveis. Não é ainda contato com a malha exata nem motion warping de raiz.
 
 RenIK experimental integrado como alternativa ao FABRIK nativo. Troca de backend, proteção para rigs não alinhados a +Y e métricas por backend; sem alegação de superioridade. Alpha.13 aprovada no CI e publicada.
 

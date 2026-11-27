@@ -23,3 +23,6 @@ Optado pelo SkeletonIK3D/FABRIK nativo como baseline do Godot 4.4.1, para reduzi
 
 ## alpha.14 — RenIK selecionável (CI pendente)
 Cópia do módulo de membros/helper MIT em game/addons/renik, licença incluída. Preservados originais. Backend padrão FABRIK; RenIK usa target no mundo e orientação de entrada, sem movimento de ombro nem estiramento. Guardas de eixo +Y e cadeia direta: rigs incompatíveis permanecem no FABRIK até adaptação explícita. Teste sintético mede erro e rejeita alvos impossíveis; não prova precisão em rigs reais. JSON registra backend e amostras. AMSG continua arquivado. Não trocar engine.
+
+## alpha.15 — contato contextual por fase (CI pendente)
+Reutiliza FABRIK nativo e colisores caixa existentes. Captura ponto mais próximo ou face superior em coordenadas normalizadas, por rig/objeto/clipe/osso, com janela temporal de influência suave e rejeição de alcance. Não altera clipes nem dimensões do objeto para mascarar erro. Correção opcional, um membro por vez, priorizada sobre IK de mão de apoio; não resolve contato de mão equipada, sola real, colisão fina ou deslocamento da raiz. Testes de geometria e cadeia de perna; validação de rig real/dispositivo pendente. AMSG permanece arquivado: tween de transform não é determinístico em seek e não respeita colisão por si só.

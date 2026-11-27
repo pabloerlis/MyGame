@@ -412,7 +412,7 @@ func _run() -> void:
 	# Programmatic assignment does not guarantee TextEdit.text_changed; mirror explicit UI save.
 	lab._save_reviews()
 	var report: Variant = JSON.parse_string(lab._report_json())
-	if not report is Dictionary or report["reviews"].size() != 1 or report["reviews"][0]["notes"] != "Teste de encaixe: mão esquerda" or report["current"]["notes"] != "Observação atual" or report["build"] != "0.1.0-alpha.14" or not report["current"].has("supportIK") or not report.has("supportProfiles"):
+	if not report is Dictionary or report["reviews"].size() != 1 or report["reviews"][0]["notes"] != "Teste de encaixe: mão esquerda" or report["current"]["notes"] != "Observação atual" or report["build"] != "0.1.0-alpha.15" or not report["current"].has("contextIK") or not report.has("contextContactProfiles") or not report["current"].has("supportIK") or not report.has("supportProfiles"):
 		push_error("Review JSON failed")
 		quit(1)
 		return
@@ -434,6 +434,11 @@ func _run() -> void:
 		quit(1)
 		return
 	print("RENIK_OK: backend selection, finite result, reach rejection and axis guard.")
+	if not _test_context_geometry():
+		push_error("Context anchor geometry failed")
+		quit(1)
+		return
+	print("CONTEXT_ANCHOR_OK: closest surface, top, rescale, phase window and leg mapping.")
 	quit(0)
 
 func _test_support_ik() -> bool:
@@ -487,4 +492,23 @@ func _test_renik() -> bool:
 	ok = ok and solver.state == "renik_rig_incompatible" and not solver.renik.active
 	solver.clear()
 	rig.queue_free()
+	return ok
+
+func _test_context_geometry() -> bool:
+	var g = preload("res://lab/context_contact.gd")
+	var half := Vector3(1.0, 0.5, 0.75)
+	var top: Vector3 = g.top_surface(Vector3(0.25, 2, -0.3), half)
+	var side: Vector3 = g.nearest_surface(Vector3(2, 0.1, 0), half)
+	var inside: Vector3 = g.nearest_surface(Vector3.ZERO, half)
+	var ok := top.is_equal_approx(Vector3(0.25, 1, -0.4)) and side.is_equal_approx(Vector3(1, 0.2, 0))
+	ok = ok and inside.is_equal_approx(Vector3(0, 1, 0))
+	ok = ok and (top * (half * Vector3(2, 3, 1))).is_equal_approx(Vector3(0.5, 1.5, -0.3))
+	ok = ok and is_equal_approx(g.phase_weight(0.5, 0.5, 0.3), 1.0) and is_zero_approx(g.phase_weight(0.1, 0.5, 0.3))
+	var rig := Skeleton3D.new()
+	for bone in ["Root", "LeftUpperLeg", "LeftLowerLeg", "LeftFoot"]:
+		rig.add_bone(bone)
+	for i in range(1, 4):
+		rig.set_bone_parent(i, i - 1)
+	ok = ok and preload("res://lab/contact_ik.gd").chain(rig, 3) == PackedInt32Array([1, 2, 3])
+	rig.free()
 	return ok
