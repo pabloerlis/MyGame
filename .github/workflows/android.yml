@@ -67,17 +67,21 @@ jobs:
           mkdir -p "$HOME/.config/godot" "$HOME/.android" build
           keytool -genkeypair -keystore "$HOME/.android/debug.keystore" -storepass android -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           printf '[gd_resource type="EditorSettings" format=3]\n\n[resource]\nexport/android/java_sdk_path = "%s"\nexport/android/android_sdk_path = "%s"\nexport/android/debug_keystore = "%s/.android/debug.keystore"\nexport/android/debug_keystore_user = "androiddebugkey"\nexport/android/debug_keystore_pass = "android"\n' "$JAVA_HOME" "$ANDROID_HOME" "$HOME" > "$HOME/.config/godot/editor_settings-4.4.tres"
-      - name: Import real scenes
+      - name: Import real scenes using software OpenGL
         shell: bash
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
         run: |
           set -o pipefail
-          godot --headless --path game --editor --import --quit 2>&1 | tee build/import.log
+          sudo apt-get update -qq
+          sudo apt-get install -y xvfb xauth libgl1-mesa-dri
+          xvfb-run -a godot --rendering-method gl_compatibility --audio-driver Dummy --path game --editor --import --quit 2>&1 | tee build/import.log
           if grep -E 'SCRIPT ERROR|Parse Error|^ERROR:' build/import.log; then exit 1; fi
       - name: Smoke test
         shell: bash
         run: |
           set -o pipefail
-          godot --headless --path game --script res://tests/smoke.gd 2>&1 | tee build/smoke.log
+          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a godot --rendering-method gl_compatibility --audio-driver Dummy --path game --script res://tests/smoke.gd 2>&1 | tee build/smoke.log
           grep -q SMOKE_OK build/smoke.log
           if grep -E 'SCRIPT ERROR|Parse Error|^ERROR:' build/smoke.log; then exit 1; fi
       - name: Export and verify APK
