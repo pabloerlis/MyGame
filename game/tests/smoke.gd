@@ -412,7 +412,7 @@ func _run() -> void:
 	# Programmatic assignment does not guarantee TextEdit.text_changed; mirror explicit UI save.
 	lab._save_reviews()
 	var report: Variant = JSON.parse_string(lab._report_json())
-	if not report is Dictionary or report["reviews"].size() != 1 or report["reviews"][0]["notes"] != "Teste de encaixe: mão esquerda" or report["current"]["notes"] != "Observação atual" or report["build"] != "0.1.0-alpha.15" or not report["current"].has("contextIK") or not report.has("contextContactProfiles") or not report["current"].has("supportIK") or not report.has("supportProfiles"):
+	if not report is Dictionary or report["reviews"].size() != 1 or report["reviews"][0]["notes"] != "Teste de encaixe: mão esquerda" or report["current"]["notes"] != "Observação atual" or report["build"] != "0.1.0-alpha.16" or not report["current"].has("bodyWarp") or not report.has("bodyWarpProfiles") or not report["current"].has("contextIK") or not report.has("contextContactProfiles") or not report["current"].has("supportIK") or not report.has("supportProfiles"):
 		push_error("Review JSON failed")
 		quit(1)
 		return
@@ -439,6 +439,21 @@ func _run() -> void:
 		quit(1)
 		return
 	print("CONTEXT_ANCHOR_OK: closest surface, top, rescale, phase window and leg mapping.")
+	if not _test_body_warp():
+		push_error("Body warp geometry failed")
+		quit(1)
+		return
+	if not is_instance_valid(lab.warp_root) or lab.actor.get_parent() != lab.warp_root:
+		push_error("Actor wrapper missing")
+		quit(1)
+		return
+	lab.warp_root.position = Vector3(0.1, 0.2, 0.3)
+	lab._reset_warp_frame()
+	if not lab.warp_root.position.is_zero_approx():
+		push_error("Warp did not reset")
+		quit(1)
+		return
+	print("BODY_WARP_OK: bounded translation, axis filter, swept box guard, wrapper and reset.")
 	quit(0)
 
 func _test_support_ik() -> bool:
@@ -511,4 +526,17 @@ func _test_context_geometry() -> bool:
 		rig.set_bone_parent(i, i - 1)
 	ok = ok and preload("res://lab/contact_ik.gd").chain(rig, 3) == PackedInt32Array([1, 2, 3])
 	rig.free()
+	return ok
+
+func _test_body_warp() -> bool:
+	var w = preload("res://lab/body_warp.gd")
+	var half := Vector3(0.5, 0.5, 0.5)
+	var p: Vector3 = w.proposed_offset(Vector3.ZERO, Vector3(1, 1, 0), 0.5, 0.4, 1)
+	var ok := p.is_equal_approx(Vector3(0.2, 0, 0))
+	ok = ok and w.proposed_offset(Vector3.ZERO, Vector3(1, 1, 0), 1.0, 0.3, 2).is_equal_approx(Vector3(0, 0.3, 0))
+	ok = ok and is_equal_approx(w.safe_fraction(PackedVector3Array([Vector3(-2, 1, 0)]), Vector3(4, 0, 0), half, 0.1), 1.0)
+	var blocked: float = w.safe_fraction(PackedVector3Array([Vector3(-1, 0, 0)]), Vector3(2, 0, 0), half, 0.1)
+	ok = ok and blocked > 0.18 and blocked < 0.21
+	ok = ok and is_zero_approx(w.safe_fraction(PackedVector3Array([Vector3.ZERO]), Vector3(2, 0, 0), half, 0.1))
+	ok = ok and is_zero_approx(w.safe_fraction(PackedVector3Array(), Vector3(2, 0, 0), half, 0.1))
 	return ok

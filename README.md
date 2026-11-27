@@ -2,7 +2,9 @@
 
 RPG 3D de ação, sobrevivência, exploração e progressão, com identidade própria e estética low-poly de fantasia. PC como plataforma-alvo do jogo final; Android como plataforma exclusiva de testes e entregas da etapa de laboratório; experiência offline; ferramentas e assets gratuitos. O projeto inicia pelo laboratório de validação, não pelo mundo do jogo.
 
-## Estado: 0.1.0-alpha.15 — contato contextual por fase (CI pendente)
+## Estado: 0.1.0-alpha.16 — deslocamento contextual do corpo (CI pendente)
+
+Camada de translação por fase antes do IK, limite e eixos configuráveis, proteção aproximada de pontos do tronco contra colisor expandido, perfis exportáveis. Alpha.14 e alpha.15 aprovadas no CI; alpha.15 publicada.
 
 Captura de superfície aproximada para mão/pé livre, anchor normalizado que acompanha a escala do objeto, janela temporal com transição suave, prioridade sobre IK de apoio e perfis persistentes exportáveis. Não é ainda contato com a malha exata nem motion warping de raiz.
 

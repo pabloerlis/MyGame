@@ -4,6 +4,18 @@ const EquipmentRules = preload("res://lab/equipment_rules.gd")
 const ContactIK = preload("res://lab/contact_ik.gd")
 var support_solver = ContactIK.new()
 const ContextGeometry = preload("res://lab/context_contact.gd")
+const BodyWarp = preload("res://lab/body_warp.gd")
+var warp_root: Node3D
+var warp_enabled: CheckButton
+var warp_axis: OptionButton
+var warp_limit: HSlider
+var warp_label: Label
+var warp_profiles := {}
+var warp_path := "user://body-warp-v1.cfg"
+var warp_offset := Vector3.ZERO
+var warp_requested := Vector3.ZERO
+var warp_fraction := 0.0
+var warp_state := "disabled"
 var context_solver = ContactIK.new()
 var context_ik_enabled: CheckButton
 var context_ik_span: HSlider
@@ -175,6 +187,7 @@ func _ready() -> void:
 	_load_grip_profiles()
 	_load_support_profiles()
 	_load_context_ik_profiles()
+	_load_warp_profiles()
 	_load_reviews()
 	var file := FileAccess.open("res://assets/runtime/catalog.json", FileAccess.READ)
 	if file == null:
@@ -936,9 +949,11 @@ func _load_scene(index: int) -> void:
 		player.stop()
 		for clip in original_modes:
 			player.get_animation(clip).loop_mode = original_modes[clip]
-	if is_instance_valid(actor):
-		remove_child(actor)
-		actor.queue_free()
+	if is_instance_valid(warp_root):
+		remove_child(warp_root)
+		warp_root.queue_free()
+	warp_root = null
+	warp_offset = Vector3.ZERO
 	actor = null
 	player = null
 	original_modes.clear()
@@ -961,7 +976,10 @@ func _load_scene(index: int) -> void:
 		status.text = "Cena 3D inválida"
 		return
 	actor = node
-	add_child(actor)
+	warp_root = Node3D.new()
+	warp_root.name = "AdaptiveRoot"
+	add_child(warp_root)
+	warp_root.add_child(actor)
 	skeleton = _find_skeleton(actor)
 	_populate_bones()
 	equipment_toggle.disabled = equipment_indices.is_empty() or not is_instance_valid(skeleton)
@@ -1628,6 +1646,7 @@ func _review_entry() -> Dictionary:
 	var entry := _snapshot()
 	entry["supportIK"] = _support_snapshot()
 	entry["contextIK"] = _context_ik_snapshot()
+	entry["bodyWarp"] = _warp_snapshot()
 	entry["notes"] = review_notes.text
 	entry["build"] = ProjectSettings.get_setting("application/config/version")
 	entry["itemScale"] = _vjson(_object_scale(item_index))
@@ -1675,7 +1694,7 @@ func _report_json() -> String:
 	for index in object_scales:
 		if int(index) >= 0 and int(index) < items.size():
 			scales[items[int(index)]["id"]] = _vjson(object_scales[index])
-	return JSON.stringify({"schemaVersion": 1, "build": ProjectSettings.get_setting("application/config/version"), "exportedAt": Time.get_datetime_string_from_system(true) + "Z", "current": _review_entry(), "reviews": review_records, "gripProfiles": profiles, "categoryProfiles": categories, "objectScales": scales, "supportProfiles": _support_export_profiles(), "contextContactProfiles": _context_ik_export()}, "\t")
+	return JSON.stringify({"schemaVersion": 1, "build": ProjectSettings.get_setting("application/config/version"), "exportedAt": Time.get_datetime_string_from_system(true) + "Z", "current": _review_entry(), "reviews": review_records, "gripProfiles": profiles, "categoryProfiles": categories, "objectScales": scales, "supportProfiles": _support_export_profiles(), "contextContactProfiles": _context_ik_export(), "bodyWarpProfiles": warp_profiles}, "\t")
 
 func _write_export_file(path: String) -> void:
 	var file := FileAccess.open(path, FileAccess.WRITE)
@@ -1932,6 +1951,7 @@ func _create_context_ik_ui(parent: VBoxContainer) -> void:
 	context_ik_label = Label.new()
 	context_ik_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	parent.add_child(context_ik_label)
+	_create_warp_ui(parent)
 
 func _context_ik_data() -> Dictionary:
 	if item_mode or not is_instance_valid(skeleton) or not is_instance_valid(context_root) or context_root.get_child_count() < 2 or contact_picker.selected < 0:
@@ -1983,12 +2003,15 @@ func _remove_context_ik() -> void:
 	var data := _context_ik_data()
 	if not data.is_empty():
 		context_ik_profiles.erase(str(data["key"]))
+		warp_profiles.erase(str(data["key"]))
+		_save_warp_profiles()
 		_save_context_ik_profiles()
 	_update_context_ik()
 
 func _update_context_ik() -> void:
 	if not is_instance_valid(context_ik_enabled):
 		return
+	_reset_warp_frame()
 	context_ik_weight = 0.0
 	context_ik_key = ""
 	if is_instance_valid(context_ik_marker):
@@ -2019,6 +2042,7 @@ func _update_context_ik() -> void:
 		context_ik_label.text = "Fora da janela de contato."
 		return
 	support_solver.suspend("context_priority")
+	_apply_body_warp(data, goal)
 	context_solver.apply(skeleton, int(data["bone"]), goal, context_ik_weight)
 	if context_solver.state == "active":
 		context_ik_label.text = "Caixa aproximada | influência %.0f%% | erro %.1f → %s cm" % [context_ik_weight * 100.0, context_solver.before_cm, "%.1f" % context_solver.after_cm if context_solver.after_cm >= 0.0 else "medindo"]
@@ -2067,3 +2091,120 @@ func _context_ik_export() -> Dictionary:
 		p["anchor"] = _vjson(p["anchor"])
 		result[key] = p
 	return result
+
+func _create_warp_ui(parent: VBoxContainer) -> void:
+	_section_heading(parent, "Deslocamento adaptativo do corpo", "Aproxima o corpo do contato registrado, com limite de deslocamento e proteção aproximada do tronco.")
+	warp_enabled = CheckButton.new()
+	warp_enabled.text = "Adaptar posição do corpo"
+	parent.add_child(warp_enabled)
+	warp_enabled.toggled.connect(func(_value): _update_context_ik())
+	warp_axis = OptionButton.new()
+	for label in ["Todos os eixos", "Somente horizontal", "Somente vertical"]:
+		warp_axis.add_item(label)
+	_long_picker(parent, "Direção da correção", warp_axis)
+	warp_axis.item_selected.connect(func(_index): _update_context_ik())
+	var limit_label := Label.new()
+	limit_label.text = "Limite de deslocamento: 35 cm"
+	parent.add_child(limit_label)
+	warp_limit = HSlider.new()
+	warp_limit.min_value = 5
+	warp_limit.max_value = 100
+	warp_limit.step = 5
+	warp_limit.value = 35
+	warp_limit.custom_minimum_size.y = 64
+	parent.add_child(warp_limit)
+	warp_limit.value_changed.connect(func(value: float):
+		limit_label.text = "Limite de deslocamento: %.0f cm" % value
+		_update_context_ik()
+	)
+	var save := Button.new()
+	save.text = "Salvar deslocamento para este contato"
+	parent.add_child(save)
+	save.pressed.connect(_save_warp_for_contact)
+	var restore := Button.new()
+	restore.text = "Carregar deslocamento salvo"
+	parent.add_child(restore)
+	restore.pressed.connect(_restore_warp_for_contact)
+	warp_label = Label.new()
+	warp_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	parent.add_child(warp_label)
+
+func _reset_warp_frame() -> void:
+	if is_instance_valid(warp_root):
+		warp_root.position = Vector3.ZERO
+	warp_offset = Vector3.ZERO
+	warp_requested = Vector3.ZERO
+	warp_fraction = 0.0
+	warp_state = "disabled"
+	if is_instance_valid(warp_label):
+		warp_label.text = "Sem deslocamento do corpo nesta fase."
+
+func _apply_body_warp(data: Dictionary, goal: Vector3) -> void:
+	if not is_instance_valid(warp_enabled) or not warp_enabled.button_pressed or not is_instance_valid(warp_root):
+		return
+	var collision: CollisionShape3D = data["shape"]
+	var half: Vector3 = data["half"]
+	var bone: int = data["bone"]
+	var tip := skeleton.to_global(skeleton.get_bone_global_pose(bone).origin)
+	warp_requested = BodyWarp.proposed_offset(tip, goal, context_ik_weight, warp_limit.value / 100.0, warp_axis.selected)
+	if warp_requested.is_zero_approx():
+		warp_state = "aligned"
+		warp_label.text = "Sem necessidade de deslocamento."
+		return
+	var points := PackedVector3Array()
+	for i in range(skeleton.get_bone_count()):
+		var n := str(skeleton.get_bone_name(i)).to_lower()
+		if "hips" in n or "pelvis" in n or "spine" in n or "chest" in n or n.ends_with("hip"):
+			points.append(collision.to_local(skeleton.to_global(skeleton.get_bone_global_pose(i).origin)))
+	if points.is_empty():
+		warp_state = "no_torso_proxy"
+		warp_label.text = "Rig sem referência de tronco; deslocamento bloqueado."
+		return
+	# Collision shape is the lab's unscaled world-space box. Guard the
+	# swept torso points with a conservative 10 cm margin.
+	var local_delta := collision.global_transform.basis.inverse() * warp_requested
+	warp_fraction = BodyWarp.safe_fraction(points, local_delta, half, 0.10)
+	warp_offset = warp_requested * warp_fraction
+	warp_root.global_position = global_position + warp_offset
+	warp_state = "active" if warp_fraction >= 0.999 else ("blocked" if warp_fraction <= 0.001 else "limited")
+	warp_label.text = "Corpo: %.1f / %.1f cm | %s (tronco aproximado)" % [warp_offset.length() * 100.0, warp_requested.length() * 100.0, "livre" if warp_state == "active" else "limitado pelo objeto"]
+
+func _save_warp_for_contact() -> void:
+	var data := _context_ik_data()
+	var key := str(data.get("key", ""))
+	if not context_ik_profiles.has(key):
+		warp_label.text = "Capture um contato primeiro."
+		return
+	warp_profiles[key] = {"enabled": warp_enabled.button_pressed, "axes": warp_axis.selected, "limitCm": warp_limit.value}
+	_save_warp_profiles()
+	warp_label.text = "Perfil de deslocamento salvo."
+
+func _restore_warp_for_contact() -> void:
+	var data := _context_ik_data()
+	var key := str(data.get("key", ""))
+	if not warp_profiles.has(key):
+		warp_label.text = "Sem perfil salvo para este contato."
+		return
+	var profile: Dictionary = warp_profiles[key]
+	warp_enabled.set_pressed_no_signal(bool(profile.get("enabled", false)))
+	warp_axis.select(clampi(int(profile.get("axes", 0)), 0, 2))
+	warp_limit.value = clampf(float(profile.get("limitCm", 35.0)), 5.0, 100.0)
+	_update_context_ik()
+
+func _save_warp_profiles() -> void:
+	var cfg := ConfigFile.new()
+	for key in warp_profiles:
+		cfg.set_value("warp", key, warp_profiles[key])
+	cfg.save(warp_path)
+
+func _load_warp_profiles() -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load(warp_path) != OK or not cfg.has_section("warp"):
+		return
+	for key in cfg.get_section_keys("warp"):
+		var p: Variant = cfg.get_value("warp", key)
+		if p is Dictionary:
+			warp_profiles[key] = p
+
+func _warp_snapshot() -> Dictionary:
+	return {"enabled": warp_enabled.button_pressed, "axes": warp_axis.selected, "limitCm": warp_limit.value, "state": warp_state, "offset": _vjson(warp_offset), "requested": _vjson(warp_requested), "safeFraction": warp_fraction, "collisionApproximation": "torso_points_expanded_box"}
