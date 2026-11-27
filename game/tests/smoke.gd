@@ -396,4 +396,29 @@ func _run() -> void:
 	print("ITEMS_OK: ", lab.items.size(), " models; mode switch, navigation and actor restoration.")
 	print("SMOKE_OK: ", packs.size(), " packs; ", count, " imported clip variants.")
 	print("TRANSPORT_OK: ", navigation_checks, " scenes; wrap, sync, visibility, playback mode and speed.")
+
+	# Review records include current observations, saved notes and numeric transforms.
+	var rules = preload("res://lab/equipment_rules.gd")
+	if not rules.matches("Sword", "Sword_Attack") or rules.matches("Sword_Big", "Sword_Attack") or not rules.matches("Bow_Wooden", "Bow_Shoot"):
+		push_error("Equipment action classification failed")
+		quit(1)
+		return
+	lab.review_path = "user://smoke-reviews.json"
+	lab.review_records.clear()
+	lab.review_notes.text = "Teste de encaixe: mão esquerda"
+	lab._record_review()
+	lab.review_notes.text = "Observação atual"
+	var report: Variant = JSON.parse_string(lab._report_json())
+	if not report is Dictionary or report["reviews"].size() != 1 or report["reviews"][0]["notes"] != "Teste de encaixe: mão esquerda" or report["current"]["notes"] != "Observação atual" or report["build"] != "0.1.0-alpha.12":
+		push_error("Review JSON failed")
+		quit(1)
+		return
+	lab.review_records.clear()
+	lab._load_reviews()
+	if lab.review_records.size() != 1 or lab.review_notes.text != "Observação atual":
+		push_error("Review persistence failed")
+		quit(1)
+		return
+	DirAccess.remove_absolute(lab.review_path)
+	print("REVIEW_OK: classification, JSON export and persistent notes.")
 	quit(0)

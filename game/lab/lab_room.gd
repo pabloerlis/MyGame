@@ -1,5 +1,17 @@
 extends Node3D
 const Labels = preload("res://lab/labels_pt.gd")
+const EquipmentRules = preload("res://lab/equipment_rules.gd")
+var category_profiles := {}
+var compatible_only: CheckButton
+var auto_action: CheckButton
+var review_notes: TextEdit
+var review_verdict: OptionButton
+var review_status: Label
+var review_records: Array = []
+var review_path := "user://lab-reviews-v1.json"
+var review_dialog: FileDialog
+var export_payload := ""
+var grip_source := ""
 ## Single-room inspector. Real imported scenes only; no synthetic character or clip.
 var records: Array = []
 var actor: Node3D
@@ -140,6 +152,7 @@ func _ready() -> void:
 	_create_ui()
 	_load_menu_preferences()
 	_load_grip_profiles()
+	_load_reviews()
 	var file := FileAccess.open("res://assets/runtime/catalog.json", FileAccess.READ)
 	if file == null:
 		status.text = "Assets ausentes. Execute o pipeline de aquisição."
@@ -163,7 +176,7 @@ func _ready() -> void:
 	for i in range(items.size()):
 		var record: Dictionary = items[i]
 		var name := str(record["name"]).to_lower()
-		if record["pack"] == "medieval_weapons_pack" or name.begins_with("sword") or name.begins_with("axe") or name.begins_with("bow") or name.begins_with("dagger") or name.begins_with("hammer"):
+		if record["pack"] == "medieval_weapons_pack" or name.begins_with("sword") or name.begins_with("axe") or name.begins_with("bow") or name.begins_with("dagger") or name.begins_with("hammer") or EquipmentRules.category(name) != "other":
 			equipment_indices.append(i)
 			equipment_picker.add_item(Labels.item(str(record["name"]), i) + " | " + Labels.pack(str(record["pack"])))
 	for i in range(items.size()):
@@ -282,7 +295,7 @@ func _create_ui() -> void:
 	settings_tabs.add_theme_constant_override("h_separation", 8)
 	settings_tabs.add_theme_constant_override("v_separation", 8)
 	layout.add_child(settings_tabs)
-	for section_name in ["Cena", "Movimentos", "Equipamentos", "Objetos", "Tempo"]:
+	for section_name in ["Cena", "Movimentos", "Equipamentos", "Objetos", "Tempo", "Revisão"]:
 		var tab := Button.new()
 		tab.text = section_name
 		tab.toggle_mode = true
@@ -301,7 +314,7 @@ func _create_ui() -> void:
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.add_theme_constant_override("separation", 18)
 	settings_scroll.add_child(panel)
-	for i in range(5):
+	for i in range(6):
 		var section := VBoxContainer.new()
 		section.add_theme_constant_override("separation", 14)
 		panel.add_child(section)
@@ -335,6 +348,9 @@ func _create_ui() -> void:
 	clip_picker.fit_to_longest_item = false
 	_long_picker(animation_controls, "Movimento", clip_picker)
 	clip_picker.item_selected.connect(_select_clip)
+	compatible_only = CheckButton.new()
+	compatible_only.text = "Somente movimentos compatíveis"
+	animation_controls.add_child(compatible_only)
 	var row := HBoxContainer.new()
 	animation_controls.add_child(row)
 	loop_toggle = CheckButton.new()
@@ -373,7 +389,19 @@ func _create_ui() -> void:
 	equipment_picker.fit_to_longest_item = false
 	equipment_picker.add_item("Sem equipamento")
 	_long_picker(equipment_controls, "Equipamento", equipment_picker)
-	equipment_picker.item_selected.connect(_choose_equipment)
+	equipment_picker.item_selected.connect(_equip_and_suggest)
+	auto_action = CheckButton.new()
+	auto_action.text = "Escolher movimento compatível"
+	auto_action.button_pressed = true
+	equipment_controls.add_child(auto_action)
+	var suggest := Button.new()
+	suggest.text = "Ver movimentos compatíveis"
+	equipment_controls.add_child(suggest)
+	suggest.pressed.connect(_show_compatible)
+	var reuse := Button.new()
+	reuse.text = "Reutilizar este encaixe na categoria"
+	equipment_controls.add_child(reuse)
+	reuse.pressed.connect(_save_category_grip)
 	bone_picker = OptionButton.new()
 	bone_picker.fit_to_longest_item = false
 	_long_picker(equipment_controls, "Osso de encaixe", bone_picker)
@@ -474,6 +502,7 @@ func _create_ui() -> void:
 	details = Label.new()
 	details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	panel.add_child(details)
+	_create_review_ui(sections[5], root)
 	_create_choice_overlay(root)
 	_set_menu_transparency(menu_transparency)
 	_touch_sizes(root)
@@ -551,20 +580,20 @@ func _set_settings(open: bool) -> void:
 func _select_settings_section(index: int) -> void:
 	if index < 0 or index >= sections.size():
 		return
-	if item_mode and index != 0:
+	if item_mode and index != 0 and index != 5:
 		index = 0
 	settings_section = index
 	_refresh_sections()
 	settings_scroll.scroll_vertical = 0
 
 func _refresh_sections() -> void:
-	if item_mode:
+	if item_mode and settings_section != 5:
 		settings_section = 0
 	for i in range(sections.size()):
 		sections[i].visible = i == settings_section
 		section_buttons[i].set_pressed_no_signal(i == settings_section)
 		if i != 0:
-			section_buttons[i].disabled = item_mode or (i == 2 and (equipment_indices.is_empty() or not is_instance_valid(skeleton))) or (i == 3 and context_indices.is_empty())
+			section_buttons[i].disabled = (item_mode and i != 5) or (i == 2 and (equipment_indices.is_empty() or not is_instance_valid(skeleton))) or (i == 3 and context_indices.is_empty())
 	if picker_buttons.has(scene_picker):
 		(picker_buttons[scene_picker]["group"] as Control).visible = not item_mode
 	if picker_buttons.has(item_picker):
@@ -667,6 +696,8 @@ func _rebuild_choices(query: String) -> void:
 	var search := _fold_text(query)
 	var count := 0
 	for i in range(choice_picker.item_count):
+		if choice_picker == clip_picker and compatible_only.button_pressed and not _compatible_clip(i):
+			continue
 		var name := choice_picker.get_item_text(i)
 		if not search.is_empty() and not _fold_text(name).contains(search):
 			continue
@@ -855,6 +886,7 @@ func _set_equipped_scale(percent: float) -> void:
 	if not is_instance_valid(grip):
 		return
 	grip.scale = Vector3.ONE * clampf(percent / 100.0, MIN_OBJECT_SCALE, MAX_OBJECT_SCALE)
+	grip_source = "manual"
 	grip_profiles[active_profile] = grip.transform
 	_save_grip_profiles()
 	_update_grip_label()
@@ -978,7 +1010,7 @@ func _remember_slot() -> void:
 	slot_states[active_slot] = {
 		"attachment": attachment, "grip": grip, "item": equipped_index,
 		"profile": active_profile, "bone": bone_picker.get_selected_id(),
-		"picker": equipment_picker.selected
+		"picker": equipment_picker.selected, "source": grip_source
 	}
 
 func _switch_slot(index: int) -> void:
@@ -992,6 +1024,7 @@ func _switch_slot(index: int) -> void:
 	grip = state.get("grip")
 	equipped_index = int(state.get("item", -1))
 	active_profile = str(state.get("profile", ""))
+	grip_source = str(state.get("source", ""))
 	equipment_picker.select(int(state.get("picker", 0)))
 	var bone_id := int(state.get("bone", -1))
 	if bone_id >= 0 and bone_picker.get_item_index(bone_id) >= 0:
@@ -1020,6 +1053,7 @@ func _clear_all_equipment() -> void:
 
 func _load_grip_profiles() -> void:
 	grip_profiles.clear()
+	category_profiles.clear()
 	var config := ConfigFile.new()
 	var result := config.load(profile_path)
 	if result == ERR_FILE_NOT_FOUND:
@@ -1032,6 +1066,10 @@ func _load_grip_profiles() -> void:
 		var value: Variant = config.get_value("grips", key)
 		if value is Transform3D and value.is_finite():
 			grip_profiles[key] = value
+	for key in config.get_section_keys("categories") if config.has_section("categories") else PackedStringArray():
+		var value: Variant = config.get_value("categories", key)
+		if value is Transform3D and value.is_finite():
+			category_profiles[key] = value
 	profile_status = ""
 
 func _save_grip_profiles() -> void:
@@ -1039,6 +1077,8 @@ func _save_grip_profiles() -> void:
 	config.set_value("meta", "schema", 1)
 	for key in grip_profiles:
 		config.set_value("grips", key, grip_profiles[key])
+	for key in category_profiles:
+		config.set_value("categories", key, category_profiles[key])
 	var result := config.save(profile_path)
 	profile_status = " | Salvo" if result == OK else " | Falha ao salvar"
 
@@ -1086,8 +1126,7 @@ func _choose_equipment(index: int) -> void:
 	grip.add_child(model)
 	equipped_index = record_index
 	active_profile = "%s|%s|%s|%d" % [records[scene_picker.selected]["id"], record["id"], attachment.bone_name, active_slot]
-	if grip_profiles.has(active_profile):
-		grip.transform = grip_profiles[active_profile]
+	_apply_grip_default()
 	_update_grip_label()
 
 func _adjust_grip(direction: int) -> void:
@@ -1104,21 +1143,22 @@ func _adjust_grip(direction: int) -> void:
 		var rotation_offset := grip.rotation_degrees
 		rotation_offset[axis - 3] += 15.0 * direction
 		grip.rotation_degrees = rotation_offset
+	grip_source = "manual"
 	grip_profiles[active_profile] = grip.transform
 	_save_grip_profiles()
 	_update_grip_label()
 
 func _reset_grip() -> void:
 	if is_instance_valid(grip):
-		grip.transform = Transform3D.IDENTITY
 		grip_profiles.erase(active_profile)
+		_apply_grip_default()
 		_save_grip_profiles()
 		_update_grip_label()
 
 func _update_grip_label() -> void:
 	_refresh_equipped_scale()
 	if is_instance_valid(grip):
-		equip_label.text = "%s | P %.2f %.2f %.2f m | R %.0f %.0f %.0f°" % [Labels.bone(str(attachment.bone_name), attachment.bone_idx), grip.position.x, grip.position.y, grip.position.z, grip.rotation_degrees.x, grip.rotation_degrees.y, grip.rotation_degrees.z] + profile_status
+		equip_label.text = "%s | P %.2f %.2f %.2f m | R %.0f %.0f %.0f°" % [Labels.bone(str(attachment.bone_name), attachment.bone_idx), grip.position.x, grip.position.y, grip.position.z, grip.rotation_degrees.x, grip.rotation_degrees.y, grip.rotation_degrees.z] + profile_status + " | " + EquipmentRules.source_label(grip_source)
 
 func _find_player(node: Node) -> AnimationPlayer:
 	if node is AnimationPlayer:
@@ -1431,3 +1471,191 @@ func _unhandled_input(event: InputEvent) -> void:
 			yaw -= event.relative.x * 0.006
 			pitch = clampf(pitch + event.relative.y * 0.006, -0.15, 1.2)
 		_update_camera()
+
+# Equipment integration: preserve imported animations; suggestions are not visual approval.
+func _category_key() -> String:
+	if equipped_index < 0 or not is_instance_valid(attachment):
+		return ""
+	return "%s|%s|%s|%s" % [records[scene_picker.selected]["id"], items[equipped_index]["pack"], EquipmentRules.category(str(items[equipped_index]["name"])), attachment.bone_name]
+
+func _apply_grip_default() -> void:
+	grip.transform = Transform3D.IDENTITY
+	grip_source = "pivot_unverified"
+	if grip_profiles.has(active_profile):
+		grip.transform = grip_profiles[active_profile]
+		grip_source = "manual"
+		return
+	var marker := EquipmentRules.find_grip(grip.get_child(0))
+	if is_instance_valid(marker):
+		var local := grip.global_transform.affine_inverse() * marker.global_transform
+		if local.is_finite() and absf(local.basis.determinant()) > 0.000001:
+			grip.transform = local.affine_inverse()
+			grip_source = "asset_marker_unverified"
+			return
+	var key := _category_key()
+	if category_profiles.has(key):
+		grip.transform = category_profiles[key]
+		grip_source = "category_unverified"
+
+func _save_category_grip() -> void:
+	if not is_instance_valid(grip) or equipped_index < 0:
+		return
+	if EquipmentRules.category(str(items[equipped_index]["name"])) == "other":
+		equip_label.text = "Categoria não identificada; use ajuste individual."
+		return
+	category_profiles[_category_key()] = grip.transform
+	_save_grip_profiles()
+	equip_label.text = "Encaixe salvo para peças da mesma categoria, coleção e rig. Revise cada resultado."
+
+func _compatible_clip(index: int) -> bool:
+	if index < 0 or index >= clips.size():
+		return false
+	for slot in [0, 1]:
+		var idx := equipped_index if slot == active_slot else int(slot_states.get(slot, {}).get("item", -1))
+		if idx >= 0 and EquipmentRules.matches(str(items[idx]["name"]), clips[index]):
+			return true
+	return false
+
+func _equip_and_suggest(index: int) -> void:
+	# Hand preference is applied only on user equipment selection; manual bone remains editable.
+	if index > 0 and index <= equipment_indices.size():
+		var category := EquipmentRules.category(str(items[equipment_indices[index - 1]]["name"]))
+		if category in ["bow", "shield"] and active_slot == 0:
+			var previous: Dictionary = slot_states.get(1, {})
+			if not is_instance_valid(previous.get("attachment")) and hand_bones[1] >= 0:
+				_switch_slot(1)
+	_choose_equipment(index)
+	if auto_action.button_pressed and is_instance_valid(grip) and not _compatible_clip(clip_index):
+		for i in range(clips.size()):
+			if _compatible_clip(i):
+				_select_clip(i)
+				break
+	_refresh_picker_labels()
+
+func _show_compatible() -> void:
+	compatible_only.button_pressed = true
+	_select_settings_section(1)
+	_open_choices(clip_picker, "Movimentos compatíveis")
+
+# Review/export: standard JSON, no Godot Variant strings or private device identifiers.
+func _create_review_ui(parent: VBoxContainer, root: Control) -> void:
+	_section_heading(parent, "Revisão do laboratório", "Registre cada combinação. Exporte todos os ajustes e observações em um arquivo.")
+	review_verdict = OptionButton.new()
+	for label in ["Não avaliado", "Aprovado", "Precisa de ajustes", "Incompatível"]:
+		review_verdict.add_item(label)
+	parent.add_child(review_verdict)
+	review_notes = TextEdit.new()
+	review_notes.placeholder_text = "Descreva o problema, o que ajustar ou o que foi aprovado…"
+	review_notes.custom_minimum_size.y = 160
+	review_notes.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
+	parent.add_child(review_notes)
+	review_notes.text_changed.connect(_save_reviews)
+	var add := Button.new()
+	add.text = "Registrar teste atual"
+	parent.add_child(add)
+	add.pressed.connect(_record_review)
+	var export := Button.new()
+	export.text = "Exportar JSON"
+	parent.add_child(export)
+	export.pressed.connect(_export_review)
+	var copy := Button.new()
+	copy.text = "Copiar JSON para enviar"
+	parent.add_child(copy)
+	copy.pressed.connect(_copy_review)
+	review_status = Label.new()
+	review_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	parent.add_child(review_status)
+	review_dialog = FileDialog.new()
+	root.add_child(review_dialog)
+	review_dialog.access = FileDialog.ACCESS_FILESYSTEM
+	review_dialog.file_mode = FileDialog.FILE_MODE_SAVE_FILE
+	review_dialog.use_native_dialog = true
+	review_dialog.filters = PackedStringArray(["*.json ; JSON ; application/json"])
+	review_dialog.file_selected.connect(_write_export_file)
+
+func _vjson(v: Vector3) -> Array:
+	return [v.x, v.y, v.z]
+
+func _tjson(t: Transform3D) -> Dictionary:
+	return {"position": _vjson(t.origin), "basisColumns": [_vjson(t.basis.x), _vjson(t.basis.y), _vjson(t.basis.z)], "rotationDegrees": _vjson(t.basis.get_euler() * 180.0 / PI), "scale": _vjson(t.basis.get_scale())}
+
+func _snapshot() -> Dictionary:
+	var equipped: Array = []
+	for slot in [0, 1]:
+		var state: Dictionary = slot_states.get(slot, {})
+		var idx := equipped_index if slot == active_slot else int(state.get("item", -1))
+		var node: Node3D = grip if slot == active_slot else state.get("grip")
+		var attached: BoneAttachment3D = attachment if slot == active_slot else state.get("attachment")
+		if idx >= 0 and is_instance_valid(node) and is_instance_valid(attached):
+			equipped.append({"slot": slot, "itemId": items[idx]["id"], "category": EquipmentRules.category(str(items[idx]["name"])), "bone": str(attached.bone_name), "gripSource": grip_source if slot == active_slot else state.get("source", ""), "transform": _tjson(node.transform)})
+	var t := player.current_animation_position if is_instance_valid(player) else 0.0
+	var length := _clip_length()
+	return {"mode": "item" if item_mode else "actor", "sceneId": records[scene_picker.selected]["id"] if scene_picker.selected >= 0 and scene_picker.selected < records.size() else "", "clipId": str(selected_clip), "timeSeconds": t, "durationSeconds": length, "phase": t / length if length > 0.0 else 0.0, "loop": loop_toggle.button_pressed, "speed": playback_speed, "playing": is_instance_valid(player) and player.is_playing(), "equipment": equipped, "activeSlot": active_slot, "itemId": items[item_index]["id"] if item_index >= 0 and item_index < items.size() else "", "contextId": items[context_record_index]["id"] if context_record_index >= 0 else "", "contextOffset": _vjson(context_offset), "contactBone": str(skeleton.get_bone_name(contact_picker.get_selected_id())) if is_instance_valid(skeleton) and contact_picker.selected >= 0 else "", "camera": {"yaw": yaw, "pitch": pitch, "distance": distance, "focus": _vjson(focus)}, "menuTransparency": menu_transparency, "compatibleOnly": compatible_only.button_pressed, "autoAction": auto_action.button_pressed}
+
+func _review_entry() -> Dictionary:
+	var entry := _snapshot()
+	entry["notes"] = review_notes.text
+	entry["verdict"] = ["unreviewed", "approved", "needs_adjustment", "incompatible"][maxi(0, review_verdict.selected)]
+	entry["reviewedAt"] = Time.get_datetime_string_from_system(true) + "Z"
+	return entry
+
+func _record_review() -> void:
+	review_records.append(_review_entry())
+	review_notes.text = ""
+	_save_reviews()
+
+func _save_reviews() -> void:
+	var file := FileAccess.open(review_path, FileAccess.WRITE)
+	if file == null:
+		review_status.text = "Falha ao salvar avaliações."
+		return
+	file.store_string(JSON.stringify({"reviews": review_records, "draft": review_notes.text}))
+	file.close()
+	review_status.text = "%d testes registrados. Rascunho salvo." % review_records.size()
+
+func _load_reviews() -> void:
+	if not FileAccess.file_exists(review_path):
+		return
+	var value: Variant = JSON.parse_string(FileAccess.get_file_as_string(review_path))
+	if value is Dictionary:
+		var saved: Variant = value.get("reviews", [])
+		if saved is Array:
+			review_records = saved
+		review_notes.text = str(value.get("draft", ""))
+		review_status.text = "%d testes recuperados." % review_records.size()
+
+func _report_json() -> String:
+	var profiles := {}
+	var categories := {}
+	var scales := {}
+	for key in grip_profiles:
+		profiles[key] = _tjson(grip_profiles[key])
+	for key in category_profiles:
+		categories[key] = _tjson(category_profiles[key])
+	for index in object_scales:
+		if int(index) >= 0 and int(index) < items.size():
+			scales[items[int(index)]["id"]] = _vjson(object_scales[index])
+	return JSON.stringify({"schemaVersion": 1, "build": ProjectSettings.get_setting("application/config/version"), "exportedAt": Time.get_datetime_string_from_system(true) + "Z", "current": _review_entry(), "reviews": review_records, "gripProfiles": profiles, "categoryProfiles": categories, "objectScales": scales}, "\t")
+
+func _write_export_file(path: String) -> void:
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	if file == null:
+		review_status.text = "Falha ao gravar. Use Copiar JSON para enviar."
+		return
+	file.store_string(export_payload)
+	file.close()
+	review_status.text = "JSON exportado: " + path.get_file()
+
+func _export_review() -> void:
+	export_payload = _report_json()
+	var filename := "MyGame-revisao-" + Time.get_datetime_string_from_system().replace(":", "-") + ".json"
+	var backup := FileAccess.open("user://" + filename, FileAccess.WRITE)
+	if backup != null:
+		backup.store_string(export_payload)
+		backup.close()
+	review_dialog.current_file = filename
+	review_dialog.popup_centered_ratio(0.9)
+
+func _copy_review() -> void:
+	DisplayServer.clipboard_set(_report_json())
+	review_status.text = "JSON copiado. Cole na conversa."
