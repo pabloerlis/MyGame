@@ -665,6 +665,15 @@ func _test_demo_samples(lab) -> bool:
 				var item: int = demos.find_item(lab.items, sample["item"])
 				if item < 0 or lab.equipped_index != item or not is_instance_valid(lab.attachment):
 					return false
+				var rules = preload("res://lab/equipment_rules.gd")
+				var target: float = lab.grip.get_meta("fit_target_m", 0.0)
+				var local_bounds: AABB = rules.model_bounds(lab.grip)
+				var world_scale: Vector3 = (lab.skeleton.global_transform * lab.skeleton.get_bone_global_pose(lab.skeleton.find_bone(lab.attachment.bone_name)) * lab.grip.transform).basis.get_scale().abs()
+				var extent: float = maxf(local_bounds.size.x, maxf(local_bounds.size.y, local_bounds.size.z))
+				var approximate_m: float = extent * (world_scale.x + world_scale.y + world_scale.z) / 3.0
+				if target <= 0.0 or absf(approximate_m - target) > target * 0.05:
+					print("DEMO_FIT_DIAG: ", sample["item"], " measured=", approximate_m, " target=", target, " actor=", lab.actor_height_m)
+					return false
 			if sample.has("context"):
 				var item: int = demos.find_item(lab.items, sample["context"])
 				if item < 0 or lab.context_record_index != item or not is_instance_valid(lab.context_root):
@@ -681,6 +690,7 @@ func _test_gallery(lab) -> bool:
 	var demos = preload("res://lab/demo_samples.gd")
 	var entries: Array = lab.demo_entries
 	if entries.size() < 8 or lab.demo_gallery.item_count != entries.size():
+		print("GALLERY_DIAG: entries=", entries.size(), " picker=", lab.demo_gallery.item_count)
 		return false
 	var found := false
 	for i in range(entries.size()):
@@ -688,9 +698,11 @@ func _test_gallery(lab) -> bool:
 		if str(entry["clip"]).to_lower().contains("pistol_idle"):
 			lab._choose_demo_gallery(i)
 			if not is_instance_valid(lab.grip) or not str(lab.selected_clip).to_lower().contains("pistol_idle"):
+				print("GALLERY_DIAG: selected=", lab.selected_clip, " expected=", entry["clip"], " attached=", is_instance_valid(lab.grip))
 				return false
 			lab._focus_equipment_demo()
 			found = lab.distance < 3.6 and lab.focus.is_finite()
+			print("GALLERY_DIAG: pistol distance=", lab.distance, " focus=", lab.focus)
 			break
 	var p: Vector3 = demos.face_position(Vector3(0.2, 1, -0.6), Vector3(0, 1, 0), Vector3(0.3, 0.5, 0.4))
 	return found and p.is_equal_approx(Vector3(0.2, 0, -1.0))

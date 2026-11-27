@@ -2659,7 +2659,24 @@ func _apply_demo() -> void:
 	_refresh_picker_labels()
 
 func _build_demo_gallery() -> void:
-	demo_entries = Demos.gallery(records)
+	# Godot can sanitize clip names on import. Index actual AnimationPlayers,
+	# not the original glTF metadata, so every gallery ID is playable.
+	var runtime_records: Array = []
+	for i in range(records.size()):
+		var entry: Dictionary = records[i].duplicate(true)
+		entry["clips"] = []
+		if i == scene_picker.selected and is_instance_valid(player):
+			entry["clips"] = Array(player.get_animation_list())
+		else:
+			var packed := load(str(entry["path"])) as PackedScene
+			if packed != null:
+				var candidate := packed.instantiate()
+				var imported := _find_player(candidate)
+				if is_instance_valid(imported):
+					entry["clips"] = Array(imported.get_animation_list())
+				candidate.free()
+		runtime_records.append(entry)
+	demo_entries = Demos.gallery(runtime_records)
 	demo_gallery.clear()
 	for entry in demo_entries:
 		demo_gallery.add_item("%s — %s" % [entry["label"], Labels.clip(str(entry["clip"]))])

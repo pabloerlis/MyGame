@@ -63,7 +63,7 @@ const MODEL_GRIPS := {
 	"medieval_weapons_pack/Sword": Vector3(0.50, 0.150, 0.50),
 	"medieval_weapons_pack/Axe": Vector3(0.185, 0.327, 0.50),
 	"medieval_weapons_pack/Bow_Wooden": Vector3(0.278, 0.50, 0.50),
-	"medieval_weapons_pack/Shield_Round": Vector3(0.50, 0.50, 0.88),
+	"medieval_weapons_pack/Shield_Round": Vector3(0.50, 0.50, 0.15),
 	"rpg_items_pack/Potion1_Filled": Vector3(0.50, 0.38, 0.50),
 	"survival_pack/Pistol_1": Vector3(0.185, 0.35, 0.50)
 }

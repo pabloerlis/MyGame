@@ -25,6 +25,10 @@ func _run() -> void:
 		if index < 0:
 			continue
 		lab._choose_demo_gallery(index)
+		if str(lab.selected_clip) != str(lab.demo_entries[index]["clip"]):
+			push_error("Capture selected wrong imported clip")
+			quit(1)
+			return
 		for phase in [0.25, 0.65]:
 			lab._seek_phase(phase)
 			for frame in range(3):
