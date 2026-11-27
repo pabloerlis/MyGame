@@ -19,6 +19,16 @@ Verificação de páginas oficiais em 27/11/2026; licença do arquivo distribuí
 
 Expandir pesquisa ao catálogo inteiro: criaturas, animais, vegetação, VFX, mobiliário, ferramentas, estruturas e personagens. Priorizar família Universal para rig compartilhado; outros kits precisam de teste independente. As contagens do kit completo não representam a quantidade disponível gratuitamente. Não há inventário de arquivos ou tamanho aferido ainda.
 
+## Aquisição maximalista e cobertura de capacidades
+1. Consultar o inventário local antes de procurar novos recursos; reaproveitar variantes e componentes modulares existentes.
+2. Examinar todo o catálogo oficial Quaternius e obter todas as edições gratuitas pertinentes, não apenas as listadas. Priorizar modelos rigados e bibliotecas de animação completas.
+3. Para lacunas, pesquisar outras fontes oficiais e catálogos gratuitos, incluindo coleções de animações, modelos, áudio, VFX, UI e componentes open source. Preferir CC0 e licenças que permitam redistribuição no GitHub; verificar cada licença e suas obrigações (inclusive atribuição). Recursos gratuitos com restrições não entram no Git público sem autorização de redistribuição.
+4. Avaliar estética, escala, rig, topologia, materiais, formatos, desempenho mobile e portabilidade PC. Não importar conteúdo incompatível ou duplicado sem justificativa; adaptar recursos existentes antes de rejeitá-los.
+5. Manter matriz de cobertura por capacidade: identificador, candidatos, fonte/licença, edição, disponibilidade, rig/compatibilidade, estado de importação, estado de teste e motivo de ausência. Separar contagem disponível, adquirida, importada e aprovada; não alegar 100% de cobertura sem inventário.
+6. Para lacunas remanescentes, tentar combinação de assets, retargeting e ajustes de integração. Registrar fontes pesquisadas e motivos de descarte. Não criar modelo, rig, textura, clip de animação ou efeito novo sem autorização explícita do responsável.
+
+O acervo completo de recursos relevantes e redistribuíveis permanece no repositório mesmo quando não utilizado na primeira entrega. O APK poderá conter subconjunto otimizado e pacotes adicionais autorizados; catálogo não equivale a conteúdo carregado na RAM.
+
 ## Política de publicação
 - CC0 confirmado no pacote: arquivar arquivos e textos de licença no repositório, mantendo procedência.
 - QAL: não redistribuir assets isolados, inclusive modificados. Manter fora do Git público e só usar se o modo de distribuição do produto for autorizado. Em laboratório de inspeção, evitar exportação de asset bruto; se houver dúvida sobre o produto, excluir até esclarecimento.
