@@ -398,6 +398,50 @@ func _run() -> void:
 		return
 	DirAccess.remove_absolute(lab.settings_preferences_path)
 	print("TRANSPARENCY_OK: background alpha, disk round-trip and live playback.")
+	# Responsive width after actual layout, not just a clipping mask.
+	lab._set_settings(true)
+	for section in range(6):
+		if lab.section_buttons[section].disabled:
+			continue
+		lab._select_settings_section(section)
+		await process_frame
+		await process_frame
+		var panel_rect: Rect2 = lab.catalog_panel.get_global_rect()
+		var view_rect: Rect2 = root.get_visible_rect()
+		if panel_rect.end.x > view_rect.end.x + 1.0 or lab.panel.size.x > lab.settings_scroll.size.x + 1.0:
+			push_error("Responsive settings width exceeded in section " + str(section))
+			quit(1)
+			return
+	lab._set_settings(false)
+	var original_focus: Vector3 = lab.focus
+	var original_distance: float = lab.distance
+	var original_yaw: float = lab.yaw
+	lab._pan_camera(Vector2(40, -25))
+	if lab.focus.is_equal_approx(original_focus) or not is_equal_approx(lab.distance, original_distance) or not is_equal_approx(lab.yaw, original_yaw):
+		push_error("Camera pan must translate without changing distance or orbit")
+		quit(1)
+		return
+	lab.focus = original_focus
+	lab._update_camera()
+	lab._open_quick_menu()
+	if not lab.quick_panel.visible or lab.hud_nav.visible:
+		push_error("Context menu visibility failed")
+		quit(1)
+		return
+	lab.quick_target.select(0)
+	lab._rebuild_quick_controls()
+	var old_mode: bool = lab.camera_pan_mode
+	lab._toggle_camera_gesture()
+	if old_mode == lab.camera_pan_mode:
+		push_error("Camera drag mode did not toggle")
+		quit(1)
+		return
+	lab._toggle_camera_gesture()
+	lab._close_quick_menu()
+	if not lab.hud_nav.visible:
+		push_error("Context menu did not restore transport")
+		quit(1)
+		return
 	print("UI_OK: separate settings, section navigation, searchable touch rows, selection and return.")
 	print("LOCALIZATION_COMPLETE: all imported clips, bones and items.")
 	print("ITEMS_OK: ", lab.items.size(), " models; mode switch, navigation and actor restoration.")
