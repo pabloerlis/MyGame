@@ -33,6 +33,15 @@ func _run() -> void:
 		push_error("PCK boot or activation failed")
 		quit(1)
 		return
+	if not runtime.update_bar.is_visible_in_tree() or not runtime.update_badge.is_visible_in_tree() or not runtime.version_label.text.contains("Alpha"):
+		push_error("Permanent update entry not visible")
+		quit(1)
+		return
+	runtime.open_update_panel()
+	if not runtime.panel.is_visible_in_tree() or not runtime.message.text.contains("APK:"):
+		push_error("Updater panel entry failed")
+		quit(1)
+		return
 	runtime._rollback()
 	if not runtime._entry("active").is_empty() or not runtime._entry("pending").is_empty():
 		push_error("Rollback state failed")

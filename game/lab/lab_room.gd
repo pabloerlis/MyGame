@@ -321,7 +321,7 @@ func _create_ui() -> void:
 	top.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
 	top.offset_left = 12
 	top.offset_right = -12
-	top.offset_top = 24
+	top.offset_top = 70
 	status = Label.new()
 	status.text = "MyGame Lab"
 	status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -349,7 +349,7 @@ func _create_ui() -> void:
 	camera_gesture_button.add_theme_font_size_override("font_size", 19)
 	root.add_child(camera_gesture_button)
 	camera_gesture_button.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
-	camera_gesture_button.position = Vector2(12, 114)
+	camera_gesture_button.position = Vector2(12, 160)
 	camera_gesture_button.custom_minimum_size.y = 60
 	camera_gesture_button.pressed.connect(_toggle_camera_gesture)
 	# Persistent transport: independent of the collapsible catalog.
@@ -388,6 +388,7 @@ func _create_ui() -> void:
 	catalog_panel = PanelContainer.new()
 	root.add_child(catalog_panel)
 	catalog_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	catalog_panel.offset_top = 68
 	catalog_panel.clip_contents = true
 	settings_theme = _mobile_theme()
 	settings_theme.default_font_size = 20
@@ -827,6 +828,7 @@ func _create_choice_overlay(root: Control) -> void:
 	choice_overlay = PanelContainer.new()
 	root.add_child(choice_overlay)
 	choice_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	choice_overlay.offset_top = 68
 	choice_overlay.clip_contents = true
 	choice_overlay.theme = settings_theme
 	choice_overlay.add_theme_stylebox_override("panel", _flat(Color("#151d28"), 0, 14))

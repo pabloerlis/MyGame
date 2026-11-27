@@ -124,8 +124,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           python3 tools/shell_fingerprint.py > build/shell-fingerprint.txt
-          if gh release view lab-shell-v1 --json assets > build/shell-release.json 2>/dev/null; then
-            gh release download lab-shell-v1 --pattern shell-fingerprint.txt --dir /tmp
+          if gh release view lab-shell-v2 --json assets > build/shell-release.json 2>/dev/null; then
+            gh release download lab-shell-v2 --pattern shell-fingerprint.txt --dir /tmp --clobber
             cmp /tmp/shell-fingerprint.txt build/shell-fingerprint.txt
             python3 - <<'PY'
           import json
@@ -160,6 +160,8 @@ jobs:
           LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy --path game --export-debug Android "$PWD/build/$APK_NAME" 2>&1 | tee build/export.log
           test -s "build/$APK_NAME"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify "build/$APK_NAME"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions "build/$APK_NAME" | tee build/apk-permissions.log
+          grep -q android.permission.INTERNET build/apk-permissions.log
           (cd build && sha256sum "$APK_NAME" > SHA256SUMS.txt)
       - uses: actions/upload-artifact@v4
         if: success()
@@ -183,8 +185,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create lab-shell-v1 "build/$APK_NAME" build/SHA256SUMS.txt build/shell-fingerprint.txt --target "$GITHUB_SHA" --prerelease --title "MyGame Lab Android — Runtime ABI 1" --notes "Install once. Validated content packs are distributed through lab-content-v1. Physical-device validation pending."
-          python3 tools/retain_latest_apk.py lab-shell-v1 "$APK_NAME"
+          gh release create lab-shell-v2 "build/$APK_NAME" build/SHA256SUMS.txt build/shell-fingerprint.txt --target "$GITHUB_SHA" --prerelease --title "MyGame Lab Android — Shell 2 / ABI 1" --notes "Install once. Validated content packs are distributed through lab-content-v1. Physical-device validation pending."
+          python3 tools/retain_latest_apk.py lab-shell-v2 "$APK_NAME"
       - name: Publish validated content
         if: success() && github.ref == 'refs/heads/main'
         env:

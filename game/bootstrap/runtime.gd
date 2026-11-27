@@ -23,6 +23,10 @@ var manual := false
 var embedded_version := ""
 var lab: Node
 var boot_ok := false
+var update_bar: PanelContainer
+var version_label: Label
+var update_badge: Button
+var connection_state := "Iniciando"
 
 func _ready() -> void:
 	add_to_group("lab_runtime")
@@ -143,6 +147,8 @@ func _boot() -> void:
 			_fail("Falha ao confirmar inicialização.")
 			return
 	boot_ok = true
+	connection_state = "Atualizar"
+	_refresh_update_bar()
 	_prune_packs()
 	if OS.has_feature("android"):
 		_check(false)
@@ -161,11 +167,41 @@ func _create_ui() -> void:
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.theme = Theme.new()
 	root.theme.default_font_size = 23
+	# Permanent shell-owned entry point, independent of content scripts and menus.
+	update_bar = PanelContainer.new()
+	root.add_child(update_bar)
+	update_bar.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	update_bar.offset_left = 8
+	update_bar.offset_right = -8
+	update_bar.offset_top = 4
+	update_bar.offset_bottom = 62
+	var bar_style := StyleBoxFlat.new()
+	bar_style.bg_color = Color("#17212e")
+	bar_style.set_corner_radius_all(12)
+	bar_style.content_margin_left = 10
+	bar_style.content_margin_right = 6
+	bar_style.content_margin_top = 4
+	bar_style.content_margin_bottom = 4
+	update_bar.add_theme_stylebox_override("panel", bar_style)
+	var bar := HBoxContainer.new()
+	bar.add_child(Label.new())
+	update_bar.add_child(bar)
+	version_label = bar.get_child(0) as Label
+	version_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	version_label.clip_text = true
+	version_label.add_theme_font_size_override("font_size", 19)
+	update_badge = Button.new()
+	update_badge.custom_minimum_size = Vector2(156, 48)
+	update_badge.add_theme_font_size_override("font_size", 20)
+	bar.add_child(update_badge)
+	update_badge.pressed.connect(_open_and_check)
+	_refresh_update_bar()
 	panel = PanelContainer.new()
 	root.add_child(panel)
 	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	panel.offset_left = -250
 	panel.offset_right = 250
+	panel.clip_contents = true
 	panel.offset_top = -190
 	panel.offset_bottom = 190
 	var style := StyleBoxFlat.new()
@@ -181,6 +217,7 @@ func _create_ui() -> void:
 	panel.add_child(layout)
 	var title := Label.new()
 	title.text = "Atualizações do laboratório"
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	layout.add_child(title)
 	message = Label.new()
 	message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -202,18 +239,35 @@ func _button(parent: Control, title: String, action: Callable) -> Button:
 	b.pressed.connect(action)
 	return b
 
+func _refresh_update_bar() -> void:
+	if not is_instance_valid(version_label):
+		return
+	version_label.text = "Lab " + _current_version().replace("0.1.0-alpha.", "Alpha ")
+	update_badge.text = connection_state
+
+func _open_and_check() -> void:
+	open_update_panel()
+	if stage.is_empty() and available.is_empty() and _entry("pending").is_empty():
+		_check(true)
+
 func _current_version() -> String:
 	return str(running.get("version", embedded_version))
 
 func open_update_panel() -> void:
 	panel.show()
-	message.text = "Conteúdo: " + _current_version() + " | Motor ABI " + str(ABI)
+	message.text = "Conteúdo: " + _current_version() + "\nAPK: " + embedded_version + " | ABI " + str(ABI)
+	if not available.is_empty() and _entry("pending").is_empty():
+		message.text += "\nDisponível: " + str(available["version"])
+	if not stage.is_empty():
+		message.text += "\n" + connection_state
 	rollback_button.disabled = _entry("active").is_empty()
 	if not _entry("pending").is_empty():
 		message.text += "\nAtualização pronta. Feche e reabra o aplicativo."
 		exit_button.show()
 
 func _fail(reason: String) -> void:
+	connection_state = "Recuperar"
+	_refresh_update_bar()
 	panel.show()
 	message.text = reason
 	exit_button.show()
@@ -228,14 +282,17 @@ func _check(show_panel: bool) -> void:
 		open_update_panel()
 		message.text = "Consultando GitHub…"
 	stage = "check"
+	connection_state = "Consultando…"
+	_refresh_update_bar()
 	request.download_file = ""
 	request.timeout = 30.0
 	request.body_size_limit = 2 * 1024 * 1024
 	var err := request.request(CHANNEL, PackedStringArray(["Accept: application/vnd.github+json", "X-GitHub-Api-Version: 2022-11-28"]))
 	if err != OK:
 		stage = ""
-		if manual:
-			message.text = "Sem conexão. A versão local continua disponível."
+		connection_state = "Atualizar"
+		_refresh_update_bar()
+		message.text = "Sem conexão. A versão local continua disponível."
 
 func _find_offer(release: Dictionary) -> Dictionary:
 	if str(release.get("tag_name", "")) != "lab-content-v1" or release.get("draft", true) != false:
@@ -276,6 +333,8 @@ func _download() -> void:
 	if not stage.is_empty() or available.is_empty():
 		return
 	stage = "download"
+	connection_state = "Baixando…"
+	_refresh_update_bar()
 	download_button.disabled = true
 	request.download_file = TEMP
 	request.timeout = 300.0
@@ -283,24 +342,29 @@ func _download() -> void:
 	message.text = "Baixando " + str(available["version"]) + "…"
 	if request.request(str(available["url"])) != OK:
 		stage = ""
+		connection_state = "Atualizar"
+		_refresh_update_bar()
 		download_button.disabled = false
 		message.text = "Não foi possível iniciar o download."
 
 func _response(result: int, code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
 	var finished := stage
 	stage = ""
+	connection_state = "Atualizar"
+	_refresh_update_bar()
 	if finished == "check":
 		if result != HTTPRequest.RESULT_SUCCESS or code != 200:
-			if manual:
-				message.text = "Consulta indisponível (HTTP %d). Versão local preservada." % code
+			message.text = "Consulta indisponível (HTTP %d). Versão local preservada." % code
 			return
 		var parsed: Variant = JSON.parse_string(body.get_string_from_utf8())
 		available = _find_offer(parsed) if parsed is Dictionary else {}
 		download_button.disabled = available.is_empty()
 		if not available.is_empty():
+			connection_state = "Nova versão"
+			_refresh_update_bar()
 			open_update_panel()
 			message.text = "%s disponível — %.1f MB" % [available["version"], float(available["size"]) / 1000000.0]
-		elif manual:
+		else:
 			message.text = "Nenhuma versão compatível mais recente."
 	elif finished == "download":
 		var f := FileAccess.open(TEMP, FileAccess.READ)
@@ -323,6 +387,8 @@ func _response(result: int, code: int, _headers: PackedStringArray, body: Packed
 			message.text = "Falha ao registrar atualização."
 			download_button.disabled = false
 			return
+		connection_state = "Reabrir"
+		_refresh_update_bar()
 		message.text = "Atualização verificada. Feche e reabra o aplicativo."
 		exit_button.show()
 
@@ -341,6 +407,8 @@ func _rollback() -> void:
 		state = _read_state()
 		message.text = "Não foi possível registrar restauração."
 		return
+	connection_state = "Reabrir"
+	_refresh_update_bar()
 	message.text = "Restauração registrada. Feche e reabra o aplicativo."
 	exit_button.show()
 	download_button.disabled = true
