@@ -44,3 +44,6 @@ Aprovação visual explícita do usuário das capacidades e combinações necess
 
 ## Revisão de ergonomia — alpha.10
 Página de configuração em tela cheia, sem recarregar a sala, dividida em Cena, Movimentos, Equipamentos, Objetos e Tempo. Cabeçalho e categorias fixos; corpo com rolagem somente quando necessário. Seletores extensos em página de busca separada com linhas de toque de 72 unidades na viewport de referência 540 × 960; pesquisa sem distinção de acentos. Controles básicos Anterior/Próxima e câmera permanecem na visualização 3D. Configuração aplicada imediatamente; Voltar à sala não altera escolhas. Validação física em Android pendente.
+
+## Ajuste visual ao vivo — alpha.11
+Escala de objetos de 10% a 500% do tamanho original, uniforme ou por eixo, com dimensões aproximadas em metros e restauração. Escala de objeto compartilhada entre inspeção e contexto na sessão; colisor de caixa e seu centro atualizados sem escalonar o corpo físico. Equipamentos têm escala uniforme no perfil de encaixe. Transparência do menu 0–90%, aplicada ao fundo e botões sem reduzir a opacidade do texto, com preferência salva no dispositivo. A animação segue em execução enquanto configurações estão abertas, exceto se pausada pelo usuário ou no modo de peça isolada.

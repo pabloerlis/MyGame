@@ -94,6 +94,22 @@ var choice_scroll: ScrollContainer
 var choice_list: VBoxContainer
 var choice_picker: OptionButton
 var choice_count: Label
+var settings_open := false
+var menu_transparency := 40.0
+var transparency_slider: HSlider
+var transparency_label: Label
+var settings_theme: Theme
+var settings_preferences_path := "user://lab-interface-v1.cfg"
+var object_scales := {}
+var scale_controls := {}
+var context_record_index := -1
+var context_base_size := Vector3.ZERO
+var item_base_size := Vector3.ZERO
+var item_pivot: Node3D
+var equipped_scale_slider: HSlider
+var equipped_scale_label: Label
+const MIN_OBJECT_SCALE := 0.1
+const MAX_OBJECT_SCALE := 5.0
 
 func _ready() -> void:
 	var sun := DirectionalLight3D.new()
@@ -122,6 +138,7 @@ func _ready() -> void:
 	camera.current = true
 	_update_camera()
 	_create_ui()
+	_load_menu_preferences()
 	_load_grip_profiles()
 	var file := FileAccess.open("res://assets/runtime/catalog.json", FileAccess.READ)
 	if file == null:
@@ -230,6 +247,8 @@ func _create_ui() -> void:
 	catalog_panel = PanelContainer.new()
 	root.add_child(catalog_panel)
 	catalog_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	settings_theme = _mobile_theme()
+	catalog_panel.theme = settings_theme
 	catalog_panel.add_theme_stylebox_override("panel", _flat(Color("#151d28"), 0, 24))
 	var layout := VBoxContainer.new()
 	layout.add_theme_constant_override("separation", 14)
@@ -245,6 +264,19 @@ func _create_ui() -> void:
 	settings_back.text = "Voltar à sala"
 	heading.add_child(settings_back)
 	settings_back.pressed.connect(_set_settings.bind(false))
+	transparency_label = Label.new()
+	transparency_label.text = "Transparência do menu: 40%"
+	transparency_label.add_theme_font_size_override("font_size", 20)
+	layout.add_child(transparency_label)
+	transparency_slider = HSlider.new()
+	transparency_slider.min_value = 0
+	transparency_slider.max_value = 90
+	transparency_slider.step = 5
+	transparency_slider.value = menu_transparency
+	transparency_slider.custom_minimum_size.y = 52
+	layout.add_child(transparency_slider)
+	transparency_slider.value_changed.connect(_set_menu_transparency)
+	transparency_slider.drag_ended.connect(func(_changed): _save_menu_preferences())
 	settings_tabs = GridContainer.new()
 	settings_tabs.columns = 3
 	settings_tabs.add_theme_constant_override("h_separation", 8)
@@ -292,6 +324,7 @@ func _create_ui() -> void:
 	item_picker = OptionButton.new()
 	item_picker.fit_to_longest_item = false
 	_long_picker(scene_controls, "Peça", item_picker)
+	_make_scale_controls(scene_controls, 0)
 	item_picker.item_selected.connect(_load_item)
 	scene_picker = OptionButton.new()
 	scene_picker.fit_to_longest_item = false
@@ -367,6 +400,21 @@ func _create_ui() -> void:
 	equip_label = Label.new()
 	equip_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	equipment_controls.add_child(equip_label)
+	equipped_scale_label = Label.new()
+	equipped_scale_label.text = "Tamanho do equipamento: 100%"
+	equipment_controls.add_child(equipped_scale_label)
+	equipped_scale_slider = HSlider.new()
+	equipped_scale_slider.min_value = MIN_OBJECT_SCALE * 100.0
+	equipped_scale_slider.max_value = MAX_OBJECT_SCALE * 100.0
+	equipped_scale_slider.step = 5.0
+	equipped_scale_slider.value = 100
+	equipped_scale_slider.custom_minimum_size.y = 60
+	equipment_controls.add_child(equipped_scale_slider)
+	equipped_scale_slider.value_changed.connect(_set_equipped_scale)
+	var equip_size_reset := Button.new()
+	equip_size_reset.text = "Restaurar tamanho do equipamento"
+	equipment_controls.add_child(equip_size_reset)
+	equip_size_reset.pressed.connect(_set_equipped_scale.bind(100.0))
 	_section_heading(context_controls, "Objetos de contexto", "Escolha e posicione o objeto junto ao personagem.")
 	context_picker = OptionButton.new()
 	context_picker.fit_to_longest_item = false
@@ -395,6 +443,7 @@ func _create_ui() -> void:
 	context_label = Label.new()
 	context_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	context_controls.add_child(context_label)
+	_make_scale_controls(context_controls, 1)
 	_section_heading(inspection_controls, "Tempo e contato", "Pause em um instante e confira a distância ao objeto.")
 	phase_label = Label.new()
 	phase_label.text = "Tempo da animação"
@@ -426,6 +475,7 @@ func _create_ui() -> void:
 	details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	panel.add_child(details)
 	_create_choice_overlay(root)
+	_set_menu_transparency(menu_transparency)
 	_touch_sizes(root)
 	_select_settings_section(1)
 	_set_settings(false)
@@ -481,7 +531,9 @@ func _section_heading(parent: VBoxContainer, title: String, subtitle: String) ->
 	parent.add_child(hint)
 
 func _set_settings(open: bool) -> void:
+	settings_open = open
 	if not open:
+		_save_menu_preferences()
 		_close_choices()
 	touches.clear()
 	catalog_panel.visible = open
@@ -490,6 +542,9 @@ func _set_settings(open: bool) -> void:
 	if open:
 		_refresh_sections()
 		_refresh_picker_labels()
+		_refresh_scale_controls(0)
+		_refresh_scale_controls(1)
+		_refresh_equipped_scale()
 
 func _select_settings_section(index: int) -> void:
 	if index < 0 or index >= sections.size():
@@ -512,6 +567,8 @@ func _refresh_sections() -> void:
 		(picker_buttons[scene_picker]["group"] as Control).visible = not item_mode
 	if picker_buttons.has(item_picker):
 		(picker_buttons[item_picker]["group"] as Control).visible = item_mode
+	if scale_controls.has(0):
+		(scale_controls[0]["group"] as Control).visible = item_mode
 
 func _long_picker(parent: VBoxContainer, title: String, picker: OptionButton) -> void:
 	var group := VBoxContainer.new()
@@ -543,6 +600,7 @@ func _create_choice_overlay(root: Control) -> void:
 	choice_overlay = PanelContainer.new()
 	root.add_child(choice_overlay)
 	choice_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	choice_overlay.theme = settings_theme
 	choice_overlay.add_theme_stylebox_override("panel", _flat(Color("#151d28"), 0, 24))
 	var layout := VBoxContainer.new()
 	layout.add_theme_constant_override("separation", 14)
@@ -580,6 +638,7 @@ func _open_choices(picker: OptionButton, title: String) -> void:
 	choice_picker = picker
 	choice_title.text = title
 	choice_search.text = ""
+	catalog_panel.hide()
 	choice_overlay.show()
 	_rebuild_choices("")
 
@@ -589,6 +648,7 @@ func _close_choices() -> void:
 	choice_search.release_focus()
 	choice_overlay.hide()
 	choice_picker = null
+	catalog_panel.visible = settings_open
 
 func _fold_text(value: String) -> String:
 	var text := value.to_lower().strip_edges()
@@ -629,6 +689,181 @@ func _choose_search_result(index: int) -> void:
 	picker.select(index)
 	picker.item_selected.emit(index)
 	_refresh_picker_labels()
+
+func _set_menu_transparency(value: float) -> void:
+	menu_transparency = clampf(value, 0.0, 90.0)
+	if is_instance_valid(transparency_slider):
+		transparency_slider.set_value_no_signal(menu_transparency)
+		transparency_label.text = "Transparência do menu: %d%%" % int(menu_transparency)
+	var opacity := 1.0 - menu_transparency / 100.0
+	for page in [catalog_panel, choice_overlay]:
+		if is_instance_valid(page):
+			var style := page.get_theme_stylebox("panel") as StyleBoxFlat
+			if style != null:
+				var color := style.bg_color
+				color.a = opacity
+				style.bg_color = color
+	# Fade only the backgrounds: text and hit areas remain fully opaque/active.
+	if settings_theme != null:
+		for type in ["Button", "OptionButton", "LineEdit"]:
+			for state in ["normal", "hover", "pressed", "disabled", "focus"]:
+				if not settings_theme.has_stylebox(state, type):
+					continue
+				var style := settings_theme.get_stylebox(state, type) as StyleBoxFlat
+				if style != null:
+					var color := style.bg_color
+					color.a = maxf(0.18, opacity)
+					style.bg_color = color
+		for type in ["Label", "Button", "OptionButton", "CheckButton", "LineEdit"]:
+			settings_theme.set_color("font_outline_color", type, Color("#101820"))
+			settings_theme.set_constant("outline_size", type, 3)
+
+func _load_menu_preferences() -> void:
+	var config := ConfigFile.new()
+	if config.load(settings_preferences_path) == OK:
+		var saved: Variant = config.get_value("interface", "transparency", 40.0)
+		if (saved is float or saved is int) and is_finite(float(saved)):
+			_set_menu_transparency(float(saved))
+
+func _save_menu_preferences() -> void:
+	var config := ConfigFile.new()
+	config.set_value("interface", "transparency", menu_transparency)
+	config.save(settings_preferences_path)
+
+func _make_scale_controls(parent: VBoxContainer, target: int) -> void:
+	var group := VBoxContainer.new()
+	parent.add_child(group)
+	_section_heading(group, "Tamanho do objeto", "100% corresponde ao tamanho original. Ajuste todos os eixos ou um eixo por vez.")
+	var axis := OptionButton.new()
+	for option in ["Uniforme (X, Y e Z)", "Largura (X)", "Altura (Y)", "Profundidade (Z)"]:
+		axis.add_item(option)
+	group.add_child(axis)
+	var slider := HSlider.new()
+	slider.min_value = MIN_OBJECT_SCALE * 100.0
+	slider.max_value = MAX_OBJECT_SCALE * 100.0
+	slider.step = 1.0
+	slider.value = 100.0
+	slider.custom_minimum_size.y = 60
+	group.add_child(slider)
+	var row := HBoxContainer.new()
+	group.add_child(row)
+	for direction in [-1, 1]:
+		var step := Button.new()
+		step.text = "− 5%" if direction == -1 else "+ 5%"
+		step.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(step)
+		step.pressed.connect(func(): slider.value += direction * 5.0)
+	var reset := Button.new()
+	reset.text = "Tamanho original"
+	group.add_child(reset)
+	var label := Label.new()
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	group.add_child(label)
+	scale_controls[target] = {"group": group, "axis": axis, "slider": slider, "label": label}
+	axis.item_selected.connect(func(_index): _refresh_scale_controls(target))
+	slider.value_changed.connect(_set_object_scale.bind(target))
+	reset.pressed.connect(_reset_object_scale.bind(target))
+	_refresh_scale_controls(target)
+
+func _scale_record_index(target: int) -> int:
+	if target == 0:
+		return item_index if is_instance_valid(item_node) else -1
+	return context_record_index if is_instance_valid(context_root) else -1
+
+func _object_scale(index: int) -> Vector3:
+	return object_scales.get(index, Vector3.ONE)
+
+func _set_object_scale(percent: float, target: int) -> void:
+	var index := _scale_record_index(target)
+	if index < 0:
+		return
+	var axis: OptionButton = scale_controls[target]["axis"]
+	var factor := clampf(percent / 100.0, MIN_OBJECT_SCALE, MAX_OBJECT_SCALE)
+	var factors := _object_scale(index)
+	if axis.selected == 0:
+		factors = Vector3.ONE * factor
+	else:
+		factors[axis.selected - 1] = factor
+	object_scales[index] = factors
+	_apply_object_scales(index)
+
+func _reset_object_scale(target: int) -> void:
+	var index := _scale_record_index(target)
+	if index >= 0:
+		object_scales.erase(index)
+		_apply_object_scales(index)
+
+func _apply_object_scales(index: int) -> void:
+	if context_record_index == index and is_instance_valid(context_root):
+		_apply_context_scale()
+	if item_index == index and is_instance_valid(item_node):
+		_apply_item_scale(false)
+	_refresh_scale_controls(0)
+	_refresh_scale_controls(1)
+
+func _refresh_scale_controls(target: int) -> void:
+	if not scale_controls.has(target):
+		return
+	var ui: Dictionary = scale_controls[target]
+	var index := _scale_record_index(target)
+	var slider: HSlider = ui["slider"]
+	var axis: OptionButton = ui["axis"]
+	var label: Label = ui["label"]
+	slider.editable = index >= 0
+	if index < 0:
+		label.text = "Selecione um objeto para ajustar."
+		return
+	var factors := _object_scale(index)
+	var component := maxi(0, axis.selected - 1)
+	slider.set_value_no_signal(factors[component] * 100.0)
+	var size := (item_base_size if target == 0 else context_base_size) * factors
+	label.text = "X %.0f%%  |  Y %.0f%%  |  Z %.0f%%\nL %.2f × A %.2f × P %.2f m" % [factors.x * 100.0, factors.y * 100.0, factors.z * 100.0, size.x, size.y, size.z]
+	if axis.selected == 0 and (not is_equal_approx(factors.x, factors.y) or not is_equal_approx(factors.x, factors.z)):
+		label.text += "\nEscalas diferentes; ajuste uniforme iguala os eixos."
+
+func _apply_context_scale() -> void:
+	if not is_instance_valid(context_root) or context_root.get_child_count() < 2:
+		return
+	var factors := _object_scale(context_record_index)
+	var pivot := context_root.get_child(0) as Node3D
+	var body := context_root.get_child(1) as StaticBody3D
+	pivot.scale = factors
+	var size := context_base_size * factors
+	body.position = Vector3(0.0, size.y * 0.5, 0.0)
+	var collision := body.get_child(0) as CollisionShape3D
+	var shape := collision.shape as BoxShape3D
+	shape.size = size.max(Vector3(0.01, 0.01, 0.01))
+	_update_context()
+
+func _apply_item_scale(reframe: bool) -> void:
+	if not is_instance_valid(item_pivot):
+		return
+	var factors := _object_scale(item_index)
+	item_pivot.scale = factors
+	var size := item_base_size * factors
+	item_focus = Vector3(0, 0.12 + size.y * 0.5, 0)
+	item_distance = clampf(size.length() * 2.0, 0.25, 12.0)
+	if item_mode:
+		focus = item_focus
+		if reframe:
+			distance = item_distance
+		_update_camera()
+
+func _set_equipped_scale(percent: float) -> void:
+	if not is_instance_valid(grip):
+		return
+	grip.scale = Vector3.ONE * clampf(percent / 100.0, MIN_OBJECT_SCALE, MAX_OBJECT_SCALE)
+	grip_profiles[active_profile] = grip.transform
+	_save_grip_profiles()
+	_update_grip_label()
+
+func _refresh_equipped_scale() -> void:
+	if not is_instance_valid(equipped_scale_slider):
+		return
+	equipped_scale_slider.editable = is_instance_valid(grip)
+	var percent := grip.scale.x * 100.0 if is_instance_valid(grip) else 100.0
+	equipped_scale_slider.set_value_no_signal(percent)
+	equipped_scale_label.text = "Tamanho do equipamento: %.0f%%" % percent
 
 func _load_scene(index: int) -> void:
 	_clear_all_equipment()
@@ -879,6 +1114,7 @@ func _reset_grip() -> void:
 		_update_grip_label()
 
 func _update_grip_label() -> void:
+	_refresh_equipped_scale()
 	if is_instance_valid(grip):
 		equip_label.text = "%s | P %.2f %.2f %.2f m | R %.0f %.0f %.0f°" % [Labels.bone(str(attachment.bone_name), attachment.bone_idx), grip.position.x, grip.position.y, grip.position.z, grip.rotation_degrees.x, grip.rotation_degrees.y, grip.rotation_degrees.z] + profile_status
 
@@ -956,12 +1192,16 @@ func _choose_context(index: int) -> void:
 		remove_child(context_root)
 		context_root.queue_free()
 	context_root = null
+	context_record_index = -1
+	context_base_size = Vector3.ZERO
 	context_picker.select(index)
 	context_offset = Vector3.ZERO
 	context_label.text = "Sem objeto"
+	_refresh_scale_controls(1)
 	if index <= 0 or index > context_indices.size():
 		return
-	var record: Dictionary = items[context_indices[index - 1]]
+	var record_index: int = context_indices[index - 1]
+	var record: Dictionary = items[record_index]
 	var packed := load(str(record["path"])) as PackedScene
 	if packed == null:
 		context_label.text = "Falha ao carregar objeto"
@@ -971,7 +1211,9 @@ func _choose_context(index: int) -> void:
 		return
 	context_root = Node3D.new()
 	add_child(context_root)
-	context_root.add_child(model)
+	var pivot := Node3D.new()
+	context_root.add_child(pivot)
+	pivot.add_child(model)
 	var boxes: Array[AABB] = []
 	_collect_bounds(model, boxes)
 	if boxes.is_empty():
@@ -980,6 +1222,8 @@ func _choose_context(index: int) -> void:
 	for i in range(1, boxes.size()):
 		bounds = bounds.merge(boxes[i])
 	model.position += Vector3(-bounds.get_center().x, -bounds.position.y, -bounds.get_center().z)
+	context_record_index = record_index
+	context_base_size = bounds.size
 	var body := StaticBody3D.new()
 	context_root.add_child(body)
 	body.position = Vector3(0, bounds.size.y * 0.5, 0)
@@ -990,6 +1234,8 @@ func _choose_context(index: int) -> void:
 	body.add_child(collision)
 	context_root.visible = not item_mode
 	_reset_context()
+	_apply_context_scale()
+	_refresh_scale_controls(1)
 
 func _adjust_context(direction: int) -> void:
 	if not is_instance_valid(context_root):
@@ -1014,6 +1260,8 @@ func _clear_item() -> void:
 		remove_child(item_node)
 		item_node.queue_free()
 	item_node = null
+	item_pivot = null
+	item_base_size = Vector3.ZERO
 
 func _load_item(index: int) -> void:
 	if not item_mode or index < 0 or index >= items.size():
@@ -1028,8 +1276,11 @@ func _load_item(index: int) -> void:
 		node.free()
 		return
 	_clear_item()
-	item_node = node as Node3D
+	item_node = Node3D.new()
 	add_child(item_node)
+	item_pivot = Node3D.new()
+	item_node.add_child(item_pivot)
+	item_pivot.add_child(node)
 	item_index = index
 	item_picker.select(index)
 	var boxes: Array[AABB] = []
@@ -1038,10 +1289,11 @@ func _load_item(index: int) -> void:
 		var bounds: AABB = boxes[0]
 		for i in range(1, boxes.size()):
 			bounds = bounds.merge(boxes[i])
-		# Translate to a neutral inspection position, without rescaling the model.
-		item_node.position += Vector3(-bounds.get_center().x, 0.12 - bounds.position.y, -bounds.get_center().z)
-		item_focus = Vector3(0, 0.12 + bounds.size.y * 0.5, 0)
-		item_distance = clampf(bounds.size.length() * 2.0, 0.25, 12.0)
+		# Keep original mesh and floor anchor; scale the wrapper, not imported data.
+		(node as Node3D).position += Vector3(-bounds.get_center().x, -bounds.position.y, -bounds.get_center().z)
+		item_pivot.position = Vector3(0, 0.12, 0)
+		item_base_size = bounds.size
+		_apply_item_scale(true)
 	else:
 		item_focus = Vector3(0, 1, 0)
 		item_distance = 4.0
@@ -1049,6 +1301,7 @@ func _load_item(index: int) -> void:
 	distance = item_distance
 	status.text = "%d peças" % items.size()
 	details.text = Labels.item(str(record["name"]), index) + " | " + Labels.pack(str(record["pack"])) + " | CC0"
+	_refresh_scale_controls(0)
 	_update_camera()
 	_update_transport()
 
@@ -1084,6 +1337,7 @@ func _process(delta: float) -> void:
 		diagnostics_elapsed = 0.0
 		if is_instance_valid(catalog_panel) and catalog_panel.visible:
 			_refresh_picker_labels()
+			_refresh_equipped_scale()
 		if is_instance_valid(inspection_controls) and inspection_controls.is_visible_in_tree():
 			_update_inspection()
 
@@ -1153,7 +1407,7 @@ func _update_camera() -> void:
 	camera.look_at(focus)
 
 func _unhandled_input(event: InputEvent) -> void:
-	if catalog_panel.visible:
+	if settings_open or choice_overlay.visible:
 		return
 	if event is InputEventScreenTouch:
 		if event.pressed:

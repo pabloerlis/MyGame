@@ -179,6 +179,11 @@ func _run() -> void:
 			push_error("Dual equipment not retained on animation switch")
 			quit(1)
 			return
+		lab._set_equipped_scale(125.0)
+		if not lab.grip.scale.is_equal_approx(Vector3.ONE * 1.25):
+			push_error("Equipped object scale failed")
+			quit(1)
+			return
 		lab._reset_grip()
 		lab.equipment_picker.item_selected.emit(0)
 		if lab.attachment != null:
@@ -242,6 +247,40 @@ func _run() -> void:
 		push_error("Replay after seek failed")
 		quit(1)
 		return
+	var base_size: Vector3 = lab.context_base_size
+	var ctx_ui: Dictionary = lab.scale_controls[1]
+	ctx_ui["axis"].select(0)
+	lab._set_object_scale(200.0, 1)
+	if not box.size.is_equal_approx((base_size * 2.0).max(Vector3(0.01, 0.01, 0.01))) or not lab.context_root.get_child(0).scale.is_equal_approx(Vector3.ONE * 2.0):
+		push_error("Context uniform scale did not update geometry and collider")
+		quit(1)
+		return
+	ctx_ui["axis"].select(2)
+	lab._set_object_scale(150.0, 1)
+	var factors := Vector3(2, 1.5, 2)
+	if not box.size.is_equal_approx((base_size * factors).max(Vector3(0.01, 0.01, 0.01))) or not is_equal_approx(body.position.y, base_size.y * 0.75):
+		push_error("Context independent height scaling failed")
+		quit(1)
+		return
+	var scaled_outside: Vector3 = col.to_global(Vector3(box.size.x * 0.5 + 0.1, 0, 0))
+	if not is_equal_approx(lab._context_gap(scaled_outside), 0.1):
+		push_error("Scaled contact distance invalid")
+		quit(1)
+		return
+	var same_item: int = lab.context_record_index
+	lab._set_mode(1)
+	lab._load_item(same_item)
+	if not lab.item_pivot.scale.is_equal_approx(factors):
+		push_error("Item size not shared with context")
+		quit(1)
+		return
+	lab._reset_object_scale(0)
+	if not lab.item_pivot.scale.is_equal_approx(Vector3.ONE) or not box.size.is_equal_approx(base_size.max(Vector3(0.01, 0.01, 0.01))):
+		push_error("Original scale reset failed")
+		quit(1)
+		return
+	lab._set_mode(0)
+	print("SCALE_OK: uniform, per-axis, collider, contact distance and reset.")
 	print("INSPECTION_OK: phase, pause, time step and signed box distance.")
 	lab.next_button.pressed.emit()
 	if lab.context_root != previous_context:
@@ -294,7 +333,24 @@ func _run() -> void:
 		push_error("Untranslated names: " + str(pending_clips.keys()) + " / " + str(pending_bones.keys()))
 		quit(1)
 		return
+	lab.settings_preferences_path = "user://smoke-interface.cfg"
+	lab._set_menu_transparency(75.0)
+	lab._save_menu_preferences()
+	lab._set_menu_transparency(0.0)
+	lab._load_menu_preferences()
+	if not is_equal_approx(lab.menu_transparency, 75.0) or not is_equal_approx(lab.catalog_panel.get_theme_stylebox("panel").bg_color.a, 0.25):
+		push_error("Menu transparency or persistence failed")
+		quit(1)
+		return
+	if not is_equal_approx(lab.choice_overlay.get_theme_stylebox("panel").bg_color.a, 0.25):
+		push_error("Picker transparency failed")
+		quit(1)
+		return
 	lab._set_settings(true)
+	if not lab.player.is_playing():
+		push_error("Settings stopped live simulation")
+		quit(1)
+		return
 	lab._select_settings_section(1)
 	await process_frame
 	if not lab.catalog_panel.visible or lab.previous_button.is_visible_in_tree() or not lab.animation_controls.is_visible_in_tree():
@@ -333,6 +389,8 @@ func _run() -> void:
 		push_error("Return to room failed")
 		quit(1)
 		return
+	DirAccess.remove_absolute(lab.settings_preferences_path)
+	print("TRANSPARENCY_OK: background alpha, disk round-trip and live playback.")
 	print("UI_OK: separate settings, section navigation, searchable touch rows, selection and return.")
 	print("LOCALIZATION_COMPLETE: all imported clips, bones and items.")
 	print("ITEMS_OK: ", lab.items.size(), " models; mode switch, navigation and actor restoration.")
