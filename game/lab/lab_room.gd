@@ -6,6 +6,11 @@ var support_solver = ContactIK.new()
 const ContextGeometry = preload("res://lab/context_contact.gd")
 const BodyWarp = preload("res://lab/body_warp.gd")
 var warp_root: Node3D
+var warp_turn: CheckButton
+var warp_turn_limit: HSlider
+var warp_yaw := 0.0
+var warp_yaw_requested := 0.0
+var warp_yaw_state := "disabled"
 var warp_enabled: CheckButton
 var warp_axis: OptionButton
 var warp_limit: HSlider
@@ -2121,10 +2126,20 @@ func _update_context_ik() -> void:
 		context_ik_label.text = "Fora das janelas de contato (%d registrados)." % registered if registered > 0 else "Capture a superfície de cada mão ou pé."
 		return
 	support_solver.suspend("context_priority")
-	var proposed := BodyWarp.compromise(offsets, weights, warp_limit.value / 100.0)
 	var first: Dictionary = active[0]
 	var first_goal: Vector3 = first["goal"]
+	_apply_body_yaw(active, first)
+	# Evaluate translation from the rotated pose, never from last frame.
+	offsets.clear()
+	for data in active:
+		var bone: int = data["bone"]
+		var goal: Vector3 = data["goal"]
+		var tip := skeleton.to_global(skeleton.get_bone_global_pose(bone).origin)
+		offsets.append(BodyWarp.proposed_offset(tip, goal, 1.0, warp_limit.value / 100.0, warp_axis.selected))
+	var proposed := BodyWarp.compromise(offsets, weights, warp_limit.value / 100.0)
 	_apply_body_warp(first, first_goal, proposed)
+	if warp_turn.button_pressed and warp_enabled.button_pressed:
+		warp_label.text += "\nGiro: %.1f / %.1f° (%s)" % [rad_to_deg(warp_yaw), rad_to_deg(warp_yaw_requested), "bloqueado" if warp_yaw_state == "blocked" else ("sem referência" if warp_yaw_state == "insufficient" else "aplicado")]
 	var lines := PackedStringArray()
 	for data in active:
 		var bone: int = data["bone"]
@@ -2212,6 +2227,24 @@ func _create_warp_ui(parent: VBoxContainer) -> void:
 		limit_label.text = "Limite de deslocamento: %.0f cm" % value
 		_update_context_ik()
 	)
+	warp_turn = CheckButton.new()
+	warp_turn.text = "Adaptar giro horizontal do corpo"
+	parent.add_child(warp_turn)
+	warp_turn.toggled.connect(func(_value): _update_context_ik())
+	var turn_label := Label.new()
+	turn_label.text = "Limite de giro: 30°"
+	parent.add_child(turn_label)
+	warp_turn_limit = HSlider.new()
+	warp_turn_limit.min_value = 5
+	warp_turn_limit.max_value = 90
+	warp_turn_limit.step = 5
+	warp_turn_limit.value = 30
+	warp_turn_limit.custom_minimum_size.y = 64
+	parent.add_child(warp_turn_limit)
+	warp_turn_limit.value_changed.connect(func(value: float):
+		turn_label.text = "Limite de giro: %.0f°" % value
+		_update_context_ik()
+	)
 	var save := Button.new()
 	save.text = "Salvar deslocamento para este contato"
 	parent.add_child(save)
@@ -2226,13 +2259,52 @@ func _create_warp_ui(parent: VBoxContainer) -> void:
 
 func _reset_warp_frame() -> void:
 	if is_instance_valid(warp_root):
-		warp_root.position = Vector3.ZERO
+		warp_root.transform = Transform3D.IDENTITY
+	warp_yaw = 0.0
+	warp_yaw_requested = 0.0
+	warp_yaw_state = "disabled"
 	warp_offset = Vector3.ZERO
 	warp_requested = Vector3.ZERO
 	warp_fraction = 0.0
 	warp_state = "disabled"
 	if is_instance_valid(warp_label):
 		warp_label.text = "Sem deslocamento do corpo nesta fase."
+
+func _torso_points_world() -> PackedVector3Array:
+	var points := PackedVector3Array()
+	for i in range(skeleton.get_bone_count()):
+		var n := str(skeleton.get_bone_name(i)).to_lower()
+		if "hips" in n or "pelvis" in n or "spine" in n or "chest" in n or n.ends_with("hip"):
+			points.append(skeleton.to_global(skeleton.get_bone_global_pose(i).origin))
+	return points
+
+func _apply_body_yaw(active: Array, data: Dictionary) -> void:
+	if not warp_enabled.button_pressed or not warp_turn.button_pressed or not is_instance_valid(warp_root):
+		return
+	warp_yaw_state = "insufficient"
+	if active.size() < 2:
+		return
+	var points := PackedVector3Array()
+	var goals := PackedVector3Array()
+	var weights := PackedFloat32Array()
+	for contact in active:
+		var bone: int = contact["bone"]
+		points.append(skeleton.to_global(skeleton.get_bone_global_pose(bone).origin))
+		goals.append(contact["goal"])
+		weights.append(contact["weight"])
+	warp_yaw_requested = BodyWarp.fitted_yaw(points, goals, weights, deg_to_rad(warp_turn_limit.value))
+	if absf(warp_yaw_requested) < 0.0001:
+		warp_yaw_state = "aligned"
+		return
+	var collision: CollisionShape3D = data["shape"]
+	var half: Vector3 = data["half"]
+	var pivot := warp_root.global_position
+	if not BodyWarp.yaw_is_clear(_torso_points_world(), pivot, warp_yaw_requested, collision.global_transform, half, 0.10):
+		warp_yaw_state = "blocked"
+		return
+	warp_root.global_basis = Basis(Vector3.UP, warp_yaw_requested) * warp_root.global_basis
+	warp_yaw = warp_yaw_requested
+	warp_yaw_state = "active"
 
 func _apply_body_warp(data: Dictionary, goal: Vector3, proposed: Variant = null) -> void:
 	if not is_instance_valid(warp_enabled) or not warp_enabled.button_pressed or not is_instance_valid(warp_root):
@@ -2270,7 +2342,7 @@ func _save_warp_for_contact() -> void:
 	if not context_ik_profiles.has(key):
 		warp_label.text = "Capture um contato primeiro."
 		return
-	warp_profiles[key] = {"enabled": warp_enabled.button_pressed, "axes": warp_axis.selected, "limitCm": warp_limit.value}
+	warp_profiles[key] = {"enabled": warp_enabled.button_pressed, "axes": warp_axis.selected, "limitCm": warp_limit.value, "turn": warp_turn.button_pressed, "turnLimitDeg": warp_turn_limit.value}
 	_save_warp_profiles()
 	warp_label.text = "Perfil de deslocamento salvo."
 
@@ -2283,6 +2355,8 @@ func _restore_warp_for_contact() -> void:
 	var profile: Dictionary = warp_profiles[key]
 	warp_enabled.set_pressed_no_signal(bool(profile.get("enabled", false)))
 	warp_axis.select(clampi(int(profile.get("axes", 0)), 0, 2))
+	warp_turn.set_pressed_no_signal(bool(profile.get("turn", false)))
+	warp_turn_limit.value = clampf(float(profile.get("turnLimitDeg", 30.0)), 5.0, 90.0)
 	warp_limit.value = clampf(float(profile.get("limitCm", 35.0)), 5.0, 100.0)
 	_update_context_ik()
 
@@ -2302,4 +2376,4 @@ func _load_warp_profiles() -> void:
 			warp_profiles[key] = p
 
 func _warp_snapshot() -> Dictionary:
-	return {"enabled": warp_enabled.button_pressed, "axes": warp_axis.selected, "limitCm": warp_limit.value, "state": warp_state, "offset": _vjson(warp_offset), "requested": _vjson(warp_requested), "safeFraction": warp_fraction, "collisionApproximation": "torso_points_expanded_box"}
+	return {"enabled": warp_enabled.button_pressed, "axes": warp_axis.selected, "limitCm": warp_limit.value, "state": warp_state, "offset": _vjson(warp_offset), "requested": _vjson(warp_requested), "safeFraction": warp_fraction, "turnEnabled": warp_turn.button_pressed, "turnLimitDeg": warp_turn_limit.value, "yawDeg": rad_to_deg(warp_yaw), "yawRequestedDeg": rad_to_deg(warp_yaw_requested), "yawState": warp_yaw_state, "collisionApproximation": "torso_points_expanded_box"}

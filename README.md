@@ -2,7 +2,9 @@
 
 RPG 3D de ação, sobrevivência, exploração e progressão, com identidade própria e estética low-poly de fantasia. PC como plataforma-alvo do jogo final; Android como plataforma exclusiva de testes e entregas da etapa de laboratório; experiência offline; ferramentas e assets gratuitos. O projeto inicia pelo laboratório de validação, não pelo mundo do jogo.
 
-## Estado: 0.1.0-alpha.17 — contatos simultâneos (CI pendente)
+## Estado: 0.1.0-alpha.18 — orientação adaptativa do corpo (CI pendente)
+
+Giro horizontal opcional ajustado por dois ou mais contatos, limite angular, guarda aproximada do arco de movimento e diagnóstico por JSON. Recalcula a translação após o giro. Mantém a animação original e o reset determinístico.
 
 Até quatro cadeias independentes de mãos/pés, janelas por contato, indicadores e erros individuais, compromisso de translação ponderado. Alpha.16 aprovada no CI e publicada.
 

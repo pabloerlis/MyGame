@@ -412,7 +412,7 @@ func _run() -> void:
 	# Programmatic assignment does not guarantee TextEdit.text_changed; mirror explicit UI save.
 	lab._save_reviews()
 	var report: Variant = JSON.parse_string(lab._report_json())
-	if not report is Dictionary or report["reviews"].size() != 1 or report["reviews"][0]["notes"] != "Teste de encaixe: mão esquerda" or report["current"]["notes"] != "Observação atual" or report["build"] != "0.1.0-alpha.17" or not report["current"]["contextIK"].has("contacts") or not report["current"].has("bodyWarp") or not report.has("bodyWarpProfiles") or not report["current"].has("contextIK") or not report.has("contextContactProfiles") or not report["current"].has("supportIK") or not report.has("supportProfiles"):
+	if not report is Dictionary or report["reviews"].size() != 1 or report["reviews"][0]["notes"] != "Teste de encaixe: mão esquerda" or report["current"]["notes"] != "Observação atual" or report["build"] != "0.1.0-alpha.18" or not report["current"]["bodyWarp"].has("yawDeg") or not report["current"]["contextIK"].has("contacts") or not report["current"].has("bodyWarp") or not report.has("bodyWarpProfiles") or not report["current"].has("contextIK") or not report.has("contextContactProfiles") or not report["current"].has("supportIK") or not report.has("supportProfiles"):
 		push_error("Review JSON failed")
 		quit(1)
 		return
@@ -459,6 +459,17 @@ func _run() -> void:
 		quit(1)
 		return
 	print("MULTI_CONTACT_OK: independent limb solvers, weighted root compromise and exact tip guard.")
+	if not _test_body_yaw():
+		push_error("Body yaw fit or guard failed")
+		quit(1)
+		return
+	lab.warp_root.rotation.y = 0.3
+	lab._reset_warp_frame()
+	if not lab.warp_root.transform.is_equal_approx(Transform3D.IDENTITY):
+		push_error("Warp rotation did not reset")
+		quit(1)
+		return
+	print("BODY_YAW_OK: weighted fit, limit, arc guard and reset.")
 	quit(0)
 
 func _test_support_ik() -> bool:
@@ -579,4 +590,20 @@ func _test_multi_contact() -> bool:
 	left.clear()
 	right.clear()
 	rig.queue_free()
+	return ok
+
+func _test_body_yaw() -> bool:
+	var w = preload("res://lab/body_warp.gd")
+	var points := PackedVector3Array([Vector3(-1, 0, 0), Vector3(1, 0, 0)])
+	var goals := PackedVector3Array([Vector3(2, 0, 4), Vector3(2, 0, 2)])
+	var weights := PackedFloat32Array([1.0, 1.0])
+	var ok: bool = is_equal_approx(w.fitted_yaw(points, goals, weights, PI), PI / 2.0)
+	ok = ok and is_equal_approx(w.fitted_yaw(points, goals, weights, 0.3), 0.3)
+	ok = ok and is_equal_approx(w.fitted_yaw(points, goals, PackedFloat32Array([0.5, 0.5]), 0.3), 0.15)
+	ok = ok and is_zero_approx(w.fitted_yaw(points, goals, PackedFloat32Array([1.0, 0.0]), 0.3))
+	var half := Vector3(0.2, 0.2, 0.2)
+	var box := Transform3D(Basis.IDENTITY, Vector3(0.7071, 0, -0.7071))
+	ok = ok and not w.yaw_is_clear(PackedVector3Array([Vector3(1, 0, 0)]), Vector3.ZERO, PI / 2.0, box, half, 0.05)
+	box.origin = Vector3(0, 2, 0)
+	ok = ok and w.yaw_is_clear(PackedVector3Array([Vector3(1, 0, 0)]), Vector3.ZERO, PI / 2.0, box, half, 0.05)
 	return ok
