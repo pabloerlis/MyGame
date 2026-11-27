@@ -43,7 +43,6 @@ var quick_opacity_slider: HSlider
 var quick_opacity := 0.88
 var quick_dock_button: Button
 var quick_expand_button: Button
-var quick_review_hint: Label
 var quick_choice_pending := false
 var quick_verdict: OptionButton
 var camera_pan_mode := true
@@ -722,6 +721,9 @@ func _mobile_theme() -> Theme:
 	return theme
 
 func _touch_sizes(node: Node) -> void:
+	# The compact contextual overlay uses its own touch sizes.
+	if node == quick_panel:
+		return
 	if node is BaseButton or node is LineEdit:
 		var control := node as Control
 		control.custom_minimum_size.y = maxf(control.custom_minimum_size.y, TOUCH_HEIGHT)
@@ -3110,6 +3112,8 @@ func _create_quick_menu(root: Control) -> void:
 	quick_readout = Label.new()
 	quick_readout.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	quick_readout.add_theme_font_size_override("font_size", 17)
+	quick_readout.max_lines_visible = 2
+	quick_readout.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	layout.add_child(quick_readout)
 	quick_review_fields = VBoxContainer.new()
 	quick_body.add_child(quick_review_fields)
@@ -3147,7 +3151,7 @@ func _layout_quick_panel() -> void:
 	var safe_top := 228.0
 	var safe_bottom := view.y - 12.0
 	var usable := maxf(260.0, safe_bottom - safe_top)
-	var desired := minf(usable, (540.0 if quick_expanded else 348.0))
+	var desired := minf(usable, (540.0 if quick_expanded else 400.0))
 	var y := safe_top if quick_dock_top else maxf(safe_top, safe_bottom - desired)
 	quick_panel.offset_left = 10
 	quick_panel.offset_right = -10
@@ -3519,10 +3523,7 @@ func _quick_toggle(parent: Control, title: String, source: BaseButton) -> void:
 	var button := _quick_button(parent, title, func(): source.button_pressed = not source.button_pressed)
 	button.toggle_mode = true
 	button.set_pressed_no_signal(source.button_pressed)
-	source.toggled.connect(func(enabled: bool):
-		if is_instance_valid(button):
-			button.set_pressed_no_signal(enabled)
-	)
+	source.toggled.connect(button.set_pressed_no_signal)
 
 func _quick_transform_controls(row: HBoxContainer, target: int) -> void:
 	quick_axis = OptionButton.new()
