@@ -2,7 +2,9 @@
 
 RPG 3D de ação, sobrevivência, exploração e progressão, com identidade própria e estética low-poly de fantasia. PC como plataforma-alvo do jogo final; Android como plataforma exclusiva de testes e entregas da etapa de laboratório; experiência offline; ferramentas e assets gratuitos. O projeto inicia pelo laboratório de validação, não pelo mundo do jogo.
 
-## Estado: 0.1.0-alpha.20 — demonstrações com objetos reais (CI pendente)
+## Estado: 0.1.0-alpha.21 — galeria de demonstrações e capturas reais (CI pendente)
+
+Botão Amostras na sala, seleção direta pesquisável entre bibliotecas, câmera próxima de equipamento, alinhamento aproximado de caixote a mãos em pose de empurrar. CI gera imagens PNG reais e manifesto das poses, sem declarar aprovação visual. Alpha.20 aprovada e publicada.
 
 Catálogo de 143 modelos (13 novos, incluindo nove modelos de armas de fogo e quatro objetos). Modo demonstração por padrão, encaixe automático por clipe, amostras de pistola, espada, arco, escudo, machado/árvore, cadeira, baú e caixote. Configuração inicial não equivale a aprovação visual; recarga e abertura do baú não animam o objeto nesta versão.
 

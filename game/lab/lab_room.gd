@@ -7,6 +7,11 @@ var demo_label: Label
 var demo_ready := false
 var demo_state := {}
 var demo_button: Button
+var demo_gallery: OptionButton
+var demo_entries: Array = []
+var demo_gallery_button: Button
+var demo_closeup: Button
+var demo_position_key := ""
 const ContactIK = preload("res://lab/contact_ik.gd")
 var support_solver = ContactIK.new()
 const ContextGeometry = preload("res://lab/context_contact.gd")
@@ -252,6 +257,7 @@ func _ready() -> void:
 	_refresh_sections()
 	_refresh_picker_labels()
 	demo_ready = true
+	_build_demo_gallery()
 	# Start with a visible weapon example instead of an empty idle animation.
 	for i in range(clips.size()):
 		if str(clips[i]).to_lower().contains("pistol_idle"):
@@ -283,6 +289,15 @@ func _create_ui() -> void:
 	settings_button.text = "Configurar"
 	top.add_child(settings_button)
 	settings_button.pressed.connect(_set_settings.bind(true))
+	demo_gallery_button = Button.new()
+	demo_gallery_button.text = "Amostras"
+	demo_gallery_button.disabled = true
+	top.add_child(demo_gallery_button)
+	demo_gallery_button.pressed.connect(_open_demo_gallery)
+	demo_gallery = OptionButton.new()
+	root.add_child(demo_gallery)
+	demo_gallery.hide()
+	demo_gallery.item_selected.connect(_choose_demo_gallery)
 	var reset := Button.new()
 	reset.text = "Câmera"
 	top.add_child(reset)
@@ -424,6 +439,14 @@ func _create_ui() -> void:
 	demo_button.text = "Próxima demonstração com objetos"
 	animation_controls.add_child(demo_button)
 	demo_button.pressed.connect(_next_demo)
+	demo_closeup = Button.new()
+	demo_closeup.text = "Aproximar câmera do equipamento"
+	animation_controls.add_child(demo_closeup)
+	demo_closeup.pressed.connect(_focus_equipment_demo)
+	var align_demo := Button.new()
+	align_demo.text = "Alinhar objeto à pose atual (empurrar)"
+	animation_controls.add_child(align_demo)
+	align_demo.pressed.connect(_align_push_demo)
 	demo_label = Label.new()
 	demo_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	animation_controls.add_child(demo_label)
@@ -1299,6 +1322,7 @@ func _set_mode(index: int) -> void:
 		return
 	item_mode = new_mode
 	mode_picker.select(index)
+	demo_gallery_button.disabled = item_mode or demo_entries.is_empty()
 	_refresh_sections()
 	if is_instance_valid(context_root):
 		context_root.visible = not item_mode
@@ -1335,6 +1359,7 @@ func _choose_context(index: int) -> void:
 	context_base_size = Vector3.ZERO
 	context_picker.select(index)
 	context_offset = Vector3.ZERO
+	demo_position_key = ""
 	context_label.text = "Sem objeto"
 	_refresh_scale_controls(1)
 	if index <= 0 or index > context_indices.size():
@@ -2582,7 +2607,9 @@ func _apply_demo() -> void:
 	# Preserve context scales and corrections when switching within one action.
 	if context_index_demo != context_record_index:
 		_choose_context(context_indices.find(context_index_demo) + 1 if context_index_demo >= 0 and context_indices.has(context_index_demo) else 0)
-	if is_instance_valid(context_root) and context_index_demo >= 0:
+	var position_key := "%s|%s|%s" % [scene_picker.selected, context_index_demo, sample.get("label", "")]
+	if is_instance_valid(context_root) and context_index_demo >= 0 and demo_position_key != position_key:
+		demo_position_key = position_key
 		context_offset = Vector3(0, 0, float(sample.get("z", -1.2)) - context_origin.z)
 		if sample.has("height") and context_base_size.y > 0.001:
 			var factors := _object_scale(context_index_demo)
@@ -2598,3 +2625,88 @@ func _apply_demo() -> void:
 	if sample.is_empty():
 		demo_label.text = "Sem demonstração mapeada para este movimento."
 	_refresh_picker_labels()
+
+func _build_demo_gallery() -> void:
+	demo_entries = Demos.gallery(records)
+	demo_gallery.clear()
+	for entry in demo_entries:
+		demo_gallery.add_item("%s — %s" % [entry["label"], Labels.clip(str(entry["clip"]))])
+	demo_gallery_button.disabled = demo_entries.is_empty() or item_mode
+
+func _open_demo_gallery() -> void:
+	if demo_entries.is_empty():
+		return
+	_open_choices(demo_gallery, "Demonstrações com objetos")
+
+func _choose_demo_gallery(index: int) -> void:
+	if index < 0 or index >= demo_entries.size():
+		return
+	if item_mode:
+		_set_mode(0)
+	var entry: Dictionary = demo_entries[index]
+	var scene_index := int(entry["scene"])
+	demo_toggle.set_pressed_no_signal(true)
+	if scene_picker.selected != scene_index:
+		_load_scene(scene_index)
+	var clip_id := str(entry["clip"])
+	var clip_number := clips.find(clip_id)
+	if clip_number < 0:
+		for i in range(clips.size()):
+			if str(clips[i]).get_file().to_lower() == clip_id.get_file().to_lower():
+				clip_number = i
+				break
+	if clip_number < 0:
+		demo_label.text = "Clipe da demonstração indisponível."
+		return
+	demo_gallery.select(index)
+	_select_clip(clip_number)
+	_set_settings(false)
+	focus = Vector3(0, 1, 0)
+	distance = 3.6
+	_update_camera()
+
+func _focus_equipment_demo() -> void:
+	if not is_instance_valid(grip):
+		demo_label.text = "Nenhum equipamento na mão."
+		return
+	var boxes: Array[AABB] = []
+	_collect_bounds(grip, boxes)
+	if boxes.is_empty():
+		return
+	var bounds := boxes[0]
+	for i in range(1, boxes.size()):
+		bounds = bounds.merge(boxes[i])
+	focus = bounds.get_center()
+	distance = clampf(bounds.size.length() * 2.5, 0.45, 3.5)
+	_update_camera()
+	_set_settings(false)
+
+func _align_push_demo() -> void:
+	if not is_instance_valid(context_root) or not is_instance_valid(skeleton) or not str(selected_clip).to_lower().contains("push") or hand_bones[0] < 0 or hand_bones[1] < 0:
+		demo_label.text = "Selecione uma demonstração de empurrar e pause na pose de contato."
+		return
+	_suspend_context_solvers("demo_alignment")
+	support_solver.suspend("demo_alignment")
+	_reset_warp_frame()
+	if is_instance_valid(player):
+		var time := player.current_animation_position
+		player.pause()
+		player.seek(time, true)
+	var torso := _torso_points_world()
+	if torso.is_empty():
+		demo_label.text = "Sem referência de tronco."
+		return
+	var center := Vector3.ZERO
+	for point in torso:
+		center += point
+	center /= float(torso.size())
+	var a := skeleton.to_global(skeleton.get_bone_global_pose(hand_bones[0]).origin)
+	var b := skeleton.to_global(skeleton.get_bone_global_pose(hand_bones[1]).origin)
+	var half := context_base_size * _object_scale(context_record_index) * 0.5
+	var target := Demos.face_position((a + b) * 0.5, center, half)
+	context_offset = to_local(target) - context_origin
+	_update_context()
+	demo_state["placement"] = "sampled_hands_approximate_box"
+	demo_state["placementPhase"] = _context_ik_phase()
+	demo_label.text = "Objeto alinhado à posição média das mãos nesta pose; revise altura e contato."
+	_set_settings(false)

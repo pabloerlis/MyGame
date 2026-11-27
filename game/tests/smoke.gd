@@ -415,7 +415,7 @@ func _run() -> void:
 	# Programmatic assignment does not guarantee TextEdit.text_changed; mirror explicit UI save.
 	lab._save_reviews()
 	var report: Variant = JSON.parse_string(lab._report_json())
-	if not report is Dictionary or report["reviews"].size() != 1 or report["reviews"][0]["notes"] != "Teste de encaixe: mão esquerda" or report["current"]["notes"] != "Observação atual" or report["build"] != "0.1.0-alpha.20" or not report["current"].has("demo") or not report["current"].has("balance") or not report["current"]["bodyWarp"].has("yawDeg") or not report["current"]["contextIK"].has("contacts") or not report["current"].has("bodyWarp") or not report.has("bodyWarpProfiles") or not report["current"].has("contextIK") or not report.has("contextContactProfiles") or not report["current"].has("supportIK") or not report.has("supportProfiles"):
+	if not report is Dictionary or report["reviews"].size() != 1 or report["reviews"][0]["notes"] != "Teste de encaixe: mão esquerda" or report["current"]["notes"] != "Observação atual" or report["build"] != "0.1.0-alpha.21" or not report["current"].has("demo") or not report["current"].has("balance") or not report["current"]["bodyWarp"].has("yawDeg") or not report["current"]["contextIK"].has("contacts") or not report["current"].has("bodyWarp") or not report.has("bodyWarpProfiles") or not report["current"].has("contextIK") or not report.has("contextContactProfiles") or not report["current"].has("supportIK") or not report.has("supportProfiles"):
 		push_error("Review JSON failed")
 		quit(1)
 		return
@@ -483,6 +483,11 @@ func _run() -> void:
 		quit(1)
 		return
 	print("DEMO_OK: real pistol, bow, axe/tree and chair sample mappings; actual attachment and context loading.")
+	if not _test_gallery(lab):
+		push_error("Demo gallery navigation failed")
+		quit(1)
+		return
+	print("GALLERY_OK: indexed clips across real libraries, automatic equipment, camera and pose alignment geometry.")
 	quit(0)
 
 func _test_support_ik() -> bool:
@@ -663,3 +668,21 @@ func _test_demo_samples(lab) -> bool:
 		lab._clear_all_equipment()
 		lab._choose_context(0)
 	return checks > 0 and pistol_found and tree_found
+
+func _test_gallery(lab) -> bool:
+	var demos = preload("res://lab/demo_samples.gd")
+	var entries: Array = lab.demo_entries
+	if entries.size() < 8 or lab.demo_gallery.item_count != entries.size():
+		return false
+	var found := false
+	for i in range(entries.size()):
+		var entry: Dictionary = entries[i]
+		if str(entry["clip"]).to_lower().contains("pistol_idle"):
+			lab._choose_demo_gallery(i)
+			if not is_instance_valid(lab.grip) or not str(lab.selected_clip).to_lower().contains("pistol_idle"):
+				return false
+			lab._focus_equipment_demo()
+			found = lab.distance < 3.6 and lab.focus.is_finite()
+			break
+	var p: Vector3 = demos.face_position(Vector3(0.2, 1, -0.6), Vector3(0, 1, 0), Vector3(0.3, 0.5, 0.4))
+	return found and p.is_equal_approx(Vector3(0.2, 0, -1.0))

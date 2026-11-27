@@ -94,6 +94,20 @@ jobs:
           LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a godot --rendering-method gl_compatibility --audio-driver Dummy --path game --script res://tests/smoke.gd 2>&1 | tee build/smoke.log
           grep -q SMOKE_OK build/smoke.log
           if grep -E 'SCRIPT ERROR|Parse Error|^ERROR:' build/smoke.log; then exit 1; fi
+      - name: Capture actual demonstration frames
+        shell: bash
+        run: |
+          set -o pipefail
+          export LAB_CAPTURE_DIR="$PWD/build/demo-screenshots"
+          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a -s "-screen 0 1280x1024x24" godot --rendering-method gl_compatibility --audio-driver Dummy --resolution 540x960 --path game --script res://tests/capture_demos.gd 2>&1 | tee build/capture.log
+          grep -q CAPTURE_OK build/capture.log
+          if grep -E 'SCRIPT ERROR|Parse Error|^ERROR:' build/capture.log; then exit 1; fi
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: lab-demo-screenshots
+          path: build/demo-screenshots/
+          retention-days: 7
       - name: Resolve versioned APK filename
         run: |
           python3 - <<'PY'
