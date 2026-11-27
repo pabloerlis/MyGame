@@ -290,8 +290,51 @@ func _run() -> void:
 			quit(1)
 			return
 	print("LOCALIZATION_OK: 130 item labels; original clip and bone keys preserved.")
-	print("LOCALIZATION_PENDING_CLIPS: ", pending_clips.keys())
-	print("LOCALIZATION_PENDING_BONES: ", pending_bones.keys())
+	if not pending_clips.is_empty() or not pending_bones.is_empty():
+		push_error("Untranslated names: " + str(pending_clips.keys()) + " / " + str(pending_bones.keys()))
+		quit(1)
+		return
+	lab._set_settings(true)
+	lab._select_settings_section(1)
+	await process_frame
+	if not lab.catalog_panel.visible or lab.previous_button.is_visible_in_tree() or not lab.animation_controls.is_visible_in_tree():
+		push_error("Separate settings page failed")
+		quit(1)
+		return
+	lab._open_choices(lab.clip_picker, "Movimento")
+	if not lab.choice_overlay.visible or lab.choice_list.get_child_count() != lab.clips.size():
+		push_error("Full screen picker failed")
+		quit(1)
+		return
+	lab._rebuild_choices("zzzzzzzz")
+	if lab.choice_list.get_child_count() != 0:
+		push_error("Search filtering failed")
+		quit(1)
+		return
+	lab._rebuild_choices("")
+	if lab.choice_list.get_child(0).custom_minimum_size.y < 72:
+		push_error("Search rows too small")
+		quit(1)
+		return
+	lab._choose_search_result(0)
+	if lab.choice_overlay.visible or lab.clip_index != 0 or lab.selected_clip != StringName(lab.clips[0]):
+		push_error("Search selection did not preserve original clip")
+		quit(1)
+		return
+	lab._select_settings_section(0)
+	lab._set_mode(1)
+	if not lab.section_buttons[1].disabled or lab.settings_section != 0:
+		push_error("Item mode section state failed")
+		quit(1)
+		return
+	lab._set_mode(0)
+	lab._set_settings(false)
+	if lab.catalog_panel.visible or not lab.previous_button.is_visible_in_tree() or not lab.next_button.is_visible_in_tree():
+		push_error("Return to room failed")
+		quit(1)
+		return
+	print("UI_OK: separate settings, section navigation, searchable touch rows, selection and return.")
+	print("LOCALIZATION_COMPLETE: all imported clips, bones and items.")
 	print("ITEMS_OK: ", lab.items.size(), " models; mode switch, navigation and actor restoration.")
 	print("SMOKE_OK: ", packs.size(), " packs; ", count, " imported clip variants.")
 	print("TRANSPORT_OK: ", navigation_checks, " scenes; wrap, sync, visibility, playback mode and speed.")

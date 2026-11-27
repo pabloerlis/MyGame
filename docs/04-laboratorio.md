@@ -41,3 +41,6 @@ FPS, frame time, draw calls, triângulos, tempo de carga, contagem de assets e m
 
 ## Gate
 Aprovação visual explícita do usuário das capacidades e combinações necessárias à primeira fase jogável; zero defeitos bloqueantes, sem lacunas ocultas. CI e testes de lógica não aprovam aparência. Lacunas devem ser corrigidas ou retiradas do escopo mediante aceite explícito.
+
+## Revisão de ergonomia — alpha.10
+Página de configuração em tela cheia, sem recarregar a sala, dividida em Cena, Movimentos, Equipamentos, Objetos e Tempo. Cabeçalho e categorias fixos; corpo com rolagem somente quando necessário. Seletores extensos em página de busca separada com linhas de toque de 72 unidades na viewport de referência 540 × 960; pesquisa sem distinção de acentos. Controles básicos Anterior/Próxima e câmera permanecem na visualização 3D. Configuração aplicada imediatamente; Voltar à sala não altera escolhas. Validação física em Android pendente.

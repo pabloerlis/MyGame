@@ -49,3 +49,6 @@ Painel recolhível Tempo/contato: fase normalizada, tempo em segundos, pausa ao 
 
 ## 0.1.0-alpha.9 — nomes em português
 Camada labels_pt.gd separada dos recursos e chaves técnicas: nomes das 130 peças, movimentos, coleções e ossos traduzidos para pt-BR. IDs originais continuam intactos para reprodução, vínculos, perfis e arquivos. Teste valida todos os itens e compara rótulos dos clipes/ossos sem modificar IDs; lista eventuais lacunas de tradução na CI. Nomes não reconhecidos recebem rótulo numerado em português até revisão. Validação CI e física pendentes.
+
+## 0.1.0-alpha.10 — ergonomia da configuração
+Menu antigo sobreposto substituído por tela cheia de configuração dentro da mesma cena, navegação por cinco seções, retorno explícito à sala, botões de altura mínima 72 unidades de referência e listas extensas com busca, acentos normalizados, seleção imediata. Tema escuro nativo Godot, sem dependência adicional. Todos os seletores mantêm OptionButton como modelo interno e usam botões visuais e página de seleção para listas longas. Completadas as 23 traduções de clipes e 12 ossos pendentes observados na alpha.9; testes passam a exigir zero lacunas. Testes UI verificam alternância, filtro, altura, seleção e retorno. CI e teste físico pendentes; sem alteração de conteúdo 3D.

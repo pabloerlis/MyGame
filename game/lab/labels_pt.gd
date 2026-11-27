@@ -123,6 +123,29 @@ const ITEMS := {
 	"sword_2": "Espada 2"
 }
 const CLIPS := {
+	"crouch_idle": "Repouso agachado",
+	"dance": "Dançar",
+	"driving": "Dirigir",
+	"idle_talking": "Conversar em pé",
+	"idle_torch": "Repouso com tocha",
+	"pistol_idle": "Postura com pistola",
+	"push": "Empurrar",
+	"sitting_idle": "Repouso sentado",
+	"sitting_talking": "Conversar sentado",
+	"spell_simple_idle": "Manter magia com uma mão",
+	"swim_idle": "Flutuar na água",
+	"walk_formal": "Caminhar formalmente",
+	"idle_foldarms": "Repouso com braços cruzados",
+	"idle_lantern": "Repouso com lanterna",
+	"idle_no": "Negar com a cabeça",
+	"idle_rail": "Repouso junto ao corrimão",
+	"idle_shield": "Repouso com escudo",
+	"idle_talkingphone": "Falar ao telefone",
+	"ninjajump_idle": "Postura do salto ninja",
+	"slide": "Deslizar",
+	"treechopping": "Cortar árvore",
+	"walk_carry": "Caminhar carregando objeto",
+	"zombie_idle": "Repouso de zumbi",
 	"a_tpose": "Pose T de referência",
 	"reset": "Pose inicial",
 	"backflip": "Salto mortal para trás",
@@ -630,8 +653,8 @@ const CLIPS := {
 	"sword_regular_c_rec": "Recuperação do golpe normal C",
 	"sword_regular_d": "Golpe normal de espada D",
 	"sword_regular_d_rec": "Recuperação do golpe normal D",
-	"sword_regular_combo": "Sequência de golpes normals de espada",
-	"sword_regular_combo_loop": "Sequência de golpes normals (repetição)",
+	"sword_regular_combo": "Sequência de golpes normais de espada",
+	"sword_regular_combo_loop": "Sequência de golpes normais (repetição)",
 	"turn90_l": "Girar 90° à esquerda",
 	"turn180_l": "Girar 180° à esquerda",
 	"wallrun_jump_l": "Saltar da parede à esquerda",
@@ -747,12 +770,16 @@ static func bone(original: String, index: int) -> String:
 				key = key.left(-2)
 				break
 	key = key.replace("_", "").replace("-", "").replace(".", "").replace(" ", "")
+	var terminal := ""
+	if key.ends_with("leaf"):
+		key = key.trim_suffix("leaf")
+		terminal = " (extremidade)"
 	if BONES.has(key):
-		return str(BONES[key]) + side
+		return str(BONES[key]) + side + terminal
 	for finger in ["thumb", "index", "middle", "ring", "pinky", "little"]:
 		var normalized := key.trim_prefix("hand")
 		if normalized.begins_with(finger):
 			var digit := normalized.trim_prefix(finger)
 			if digit.is_valid_int():
-				return "%s %d%s" % [BONES[finger], int(digit), side]
+				return "%s %d%s%s" % [BONES[finger], int(digit), side, terminal]
 	return "Osso %d (nome pendente)%s" % [index + 1, side]
