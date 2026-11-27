@@ -2,9 +2,13 @@
 
 RPG 3D de ação, sobrevivência, exploração e progressão, com identidade própria e estética low-poly de fantasia. PC como plataforma-alvo do jogo final; Android como plataforma exclusiva de testes e entregas da etapa de laboratório; experiência offline; ferramentas e assets gratuitos. O projeto inicia pelo laboratório de validação, não pelo mundo do jogo.
 
-## Estado: 0.1.0-alpha.1 — código experimental inicial
+## Estado: 0.1.0-alpha.1 — primeiro APK experimental publicado
 
-Sala única e importação de bibliotecas de animação implementadas em código. Aquisição, importação real, testes e APK dependem de execução confirmada da CI. Equipamentos, roupas e catálogo ampliado ainda pendentes. Consulte [estado experimental](docs/06-experimental.md).
+Sala única e duas bibliotecas de animação CC0 importadas: quatro cenas GLB e 172 instâncias de clipes. CI aprovada, assinatura verificada e APK Android ARM64 publicado (31,3 MB). Validação visual e execução física no Android ainda pendentes; equipamentos, roupas e catálogo ampliado permanecem no roadmap.
+
+- [Baixar APK experimental](https://github.com/pabloerlis/MyGame/releases/download/lab-alpha-45996718841/MyGame-Lab.apk)
+- [Execução CI aprovada](https://github.com/pabloerlis/MyGame/actions/runs/45996718841)
+- [Estado experimental e roteiro de teste físico](docs/06-experimental.md)
 
 ## Documentação
 
