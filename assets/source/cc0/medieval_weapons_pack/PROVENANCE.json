@@ -1,0 +1,156 @@
+{
+  "repository": "trebeljahr/quaternius-showcase",
+  "revision": "0128ca510d653bb04d6d1e4885bd8890b5050b4f",
+  "licenseSource": "https://github.com/trebeljahr/quaternius-showcase/blob/0128ca510d653bb04d6d1e4885bd8890b5050b4f/LICENSES.md",
+  "pack": {
+    "id": "medieval_weapons_pack",
+    "official": "https://quaternius.com/packs/medievalweapons.html",
+    "license": "CC0-1.0",
+    "files": [
+      {
+        "name": "Arrow.glb",
+        "bytes": 16828,
+        "gitBlob": "36cd59c5908a6b0ff890fddc967a3dc38c96ec29",
+        "path": "public/glb/medieval_weapons_pack/Arrow.glb"
+      },
+      {
+        "name": "Axe.glb",
+        "bytes": 63764,
+        "gitBlob": "f3e800ffba303f8f57f0f2511e1aa4026c34558a",
+        "path": "public/glb/medieval_weapons_pack/Axe.glb"
+      },
+      {
+        "name": "Axe_Double.glb",
+        "bytes": 101596,
+        "gitBlob": "ca5c95baa599e2ff59c1b2ade231571d6536a05f",
+        "path": "public/glb/medieval_weapons_pack/Axe_Double.glb"
+      },
+      {
+        "name": "Axe_Small.glb",
+        "bytes": 54740,
+        "gitBlob": "da2ae71651f7a21828b76d63e000c0455ca7e679",
+        "path": "public/glb/medieval_weapons_pack/Axe_Small.glb"
+      },
+      {
+        "name": "Bow_Evil.glb",
+        "bytes": 44556,
+        "gitBlob": "625b6932b09ed1ad1c6395474c92a5bcef023538",
+        "path": "public/glb/medieval_weapons_pack/Bow_Evil.glb"
+      },
+      {
+        "name": "Bow_Golden.glb",
+        "bytes": 45448,
+        "gitBlob": "5a1f9dea8ee895006ef4e2493c09bdeb3cd0c61a",
+        "path": "public/glb/medieval_weapons_pack/Bow_Golden.glb"
+      },
+      {
+        "name": "Bow_Wooden.glb",
+        "bytes": 42668,
+        "gitBlob": "ed8ba33364cdd631dc3b615c033867ccc144d5be",
+        "path": "public/glb/medieval_weapons_pack/Bow_Wooden.glb"
+      },
+      {
+        "name": "Bow_Wooden2.glb",
+        "bytes": 39308,
+        "gitBlob": "0a8bc695eeb35fb10754b24d3b529cc48a3ffc35",
+        "path": "public/glb/medieval_weapons_pack/Bow_Wooden2.glb"
+      },
+      {
+        "name": "Claymore.glb",
+        "bytes": 54980,
+        "gitBlob": "7e2bc34db535a5983012c09930a1ffd3b1cce720",
+        "path": "public/glb/medieval_weapons_pack/Claymore.glb"
+      },
+      {
+        "name": "Dagger.glb",
+        "bytes": 43740,
+        "gitBlob": "2d2f3ff09a4c97879384f81ce03bd83ac068ed7c",
+        "path": "public/glb/medieval_weapons_pack/Dagger.glb"
+      },
+      {
+        "name": "Dagger_2.glb",
+        "bytes": 40368,
+        "gitBlob": "bfa7f2fed8e3d3be18d7a5d6b7342a7fd3db2af1",
+        "path": "public/glb/medieval_weapons_pack/Dagger_2.glb"
+      },
+      {
+        "name": "Hammer_Double.glb",
+        "bytes": 105748,
+        "gitBlob": "7b3f80d837776c7fd33fa99c6dec6229afc67f74",
+        "path": "public/glb/medieval_weapons_pack/Hammer_Double.glb"
+      },
+      {
+        "name": "Hammer_Small.glb",
+        "bytes": 82540,
+        "gitBlob": "9b6d6ebc4b9b98fc70c48c81c1478614d1e98c0a",
+        "path": "public/glb/medieval_weapons_pack/Hammer_Small.glb"
+      },
+      {
+        "name": "Scythe.glb",
+        "bytes": 75252,
+        "gitBlob": "be496056bbaaf22576ef77121bcd1402d8d8baa5",
+        "path": "public/glb/medieval_weapons_pack/Scythe.glb"
+      },
+      {
+        "name": "Shield_Celtic_Golden.glb",
+        "bytes": 47584,
+        "gitBlob": "e8f8bb1e1103bff4377bb2032f6e68f69176d3d2",
+        "path": "public/glb/medieval_weapons_pack/Shield_Celtic_Golden.glb"
+      },
+      {
+        "name": "Shield_Heater.glb",
+        "bytes": 97820,
+        "gitBlob": "da6627ef6a41898013b944f330a30f413eb8985a",
+        "path": "public/glb/medieval_weapons_pack/Shield_Heater.glb"
+      },
+      {
+        "name": "Shield_Heater_2.glb",
+        "bytes": 63424,
+        "gitBlob": "3a46607aa4d38044cfb453ebc7d26bb01df3a65c",
+        "path": "public/glb/medieval_weapons_pack/Shield_Heater_2.glb"
+      },
+      {
+        "name": "Shield_Round.glb",
+        "bytes": 60448,
+        "gitBlob": "1b2884b6a6ada7a4519d58accf9d7bc720ef5c54",
+        "path": "public/glb/medieval_weapons_pack/Shield_Round.glb"
+      },
+      {
+        "name": "Shield_Round_2.glb",
+        "bytes": 69492,
+        "gitBlob": "178a5aa7e51d086e0f57c589982ff11e4783ef5c",
+        "path": "public/glb/medieval_weapons_pack/Shield_Round_2.glb"
+      },
+      {
+        "name": "Spear.glb",
+        "bytes": 69892,
+        "gitBlob": "32453de78544e74b4461b25482cd86b3252970ae",
+        "path": "public/glb/medieval_weapons_pack/Spear.glb"
+      },
+      {
+        "name": "Sword.glb",
+        "bytes": 48384,
+        "gitBlob": "d79773820a686fd56c9c76eb38aeca2706adcb75",
+        "path": "public/glb/medieval_weapons_pack/Sword.glb"
+      },
+      {
+        "name": "Sword_2.glb",
+        "bytes": 54156,
+        "gitBlob": "a291d99aff3ec173fa1ae4cca2e29607ee259aa2",
+        "path": "public/glb/medieval_weapons_pack/Sword_2.glb"
+      },
+      {
+        "name": "Sword_Big.glb",
+        "bytes": 50336,
+        "gitBlob": "5485c518b599d6ef0cc8dea6a02e3cadca9849d2",
+        "path": "public/glb/medieval_weapons_pack/Sword_Big.glb"
+      },
+      {
+        "name": "Sword_Golden.glb",
+        "bytes": 58220,
+        "gitBlob": "283303c890ba2d081ecd9cc01cef541b541572b3",
+        "path": "public/glb/medieval_weapons_pack/Sword_Golden.glb"
+      }
+    ]
+  }
+}
