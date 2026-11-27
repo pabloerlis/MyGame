@@ -27,6 +27,11 @@ InteractionContext: anchors, dimensões, colisões e affordances (ex.: superfíc
 ReviewRecord: schema_version, build, ids, configuração, fase normalizada, status, notas.
 Separar ActionPlayer (playback), ActionExecutor (movimento/estado), ContactSolver (alinhamento/IK), EquipmentService (sockets/compatibilidade) e Catalog (resolução de dados). UI não implementa física ou regras. Dados dirigem comportamento; scripts específicos só quando necessários.
 
+## Integração antes de produção artística
+- Usar rigs, malhas, materiais e clips existentes como fonte de verdade. Reutilizar importadores, bibliotecas, addons e recursos nativos gratuitos adequados antes de implementar equivalentes; verificar licença, dependências e portabilidade.
+- Adaptadores por família de rig, bone maps, sockets e perfis de retargeting devem maximizar a cobertura de animações e equipamentos sem remodelar personagens. Compor e mesclar clips existentes; correções de contato e transição via IK/anchors/configuração. Não sintetizar movimentos do zero se houver clipe pronto adequado.
+- Separar disponibilidade do recurso, compatibilidade técnica e aprovação visual. Toda lacuna precisa de busca registrada e alternativas consideradas; produção artística original depende de aprovação do responsável.
+
 ## Pipeline
 Originais imutáveis → inventário/licença → validação de malhas, materiais, rig e escala → normalização em metros → perfil de retargeting por família → derivados GLB/recursos Godot → catálogo → carregamento sob demanda. Usar Skeleton3D, BoneAttachment3D e AnimationPlayer/AnimationTree quando adequado. Aplicar correções por perfil, não sobrescrever clips. Não misturar root motion com deslocamento duplicado de CharacterBody3D. Testar colisões em runtime, não inferir qualidade só por importação.
 
