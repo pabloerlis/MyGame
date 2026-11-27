@@ -38,3 +38,17 @@ static func safe_fraction(points: PackedVector3Array, delta: Vector3, half: Vect
 			if i == 0:
 				return 1.0
 	return lo
+
+## Weighted compromise: one translation for all active constraints.
+## Divide by at least one so a single fading contact remains smooth.
+static func compromise(offsets: PackedVector3Array, weights: PackedFloat32Array, maximum: float) -> Vector3:
+	if offsets.size() != weights.size():
+		return Vector3.ZERO
+	var total := Vector3.ZERO
+	var weight_sum := 0.0
+	for i in range(offsets.size()):
+		var weight := clampf(weights[i], 0.0, 1.0)
+		if offsets[i].is_finite() and is_finite(weight):
+			total += offsets[i] * weight
+			weight_sum += weight
+	return (total / maxf(1.0, weight_sum)).limit_length(maxf(0.0, maximum))

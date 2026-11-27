@@ -15,8 +15,18 @@ var before_cm := -1.0
 var after_cm := -1.0
 var state := "idle"
 
+static func is_contact_tip(name: String) -> bool:
+	var n := name.to_lower().replace("_", "").replace(".", "").replace("-", "").replace(":", "").replace(" ", "")
+	for part in ["hand", "foot"]:
+		for suffix in ["left" + part, "right" + part, part + "left", part + "right", part + "l", part + "r", "l" + part, "r" + part]:
+			if n.ends_with(suffix):
+				return true
+	return n == "hand" or n == "foot"
+
 static func chain(skeleton: Skeleton3D, hand: int) -> PackedInt32Array:
 	if not is_instance_valid(skeleton) or hand < 0 or hand >= skeleton.get_bone_count():
+		return PackedInt32Array()
+	if not is_contact_tip(str(skeleton.get_bone_name(hand))):
 		return PackedInt32Array()
 	var lower := -1
 	var upper := -1

@@ -2,7 +2,9 @@
 
 RPG 3D de ação, sobrevivência, exploração e progressão, com identidade própria e estética low-poly de fantasia. PC como plataforma-alvo do jogo final; Android como plataforma exclusiva de testes e entregas da etapa de laboratório; experiência offline; ferramentas e assets gratuitos. O projeto inicia pelo laboratório de validação, não pelo mundo do jogo.
 
-## Estado: 0.1.0-alpha.16 — deslocamento contextual do corpo (CI pendente)
+## Estado: 0.1.0-alpha.17 — contatos simultâneos (CI pendente)
+
+Até quatro cadeias independentes de mãos/pés, janelas por contato, indicadores e erros individuais, compromisso de translação ponderado. Alpha.16 aprovada no CI e publicada.
 
 Camada de translação por fase antes do IK, limite e eixos configuráveis, proteção aproximada de pontos do tronco contra colisor expandido, perfis exportáveis. Alpha.14 e alpha.15 aprovadas no CI; alpha.15 publicada.
 

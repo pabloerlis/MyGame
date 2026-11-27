@@ -16,13 +16,16 @@ var warp_offset := Vector3.ZERO
 var warp_requested := Vector3.ZERO
 var warp_fraction := 0.0
 var warp_state := "disabled"
-var context_solver = ContactIK.new()
+var context_solvers := {}
+var context_multi: CheckButton
+var context_active_count := 0
+var context_contacts: Array = []
 var context_ik_enabled: CheckButton
 var context_ik_span: HSlider
 var context_ik_label: Label
 var context_ik_profiles := {}
 var context_ik_path := "user://context-contacts-v1.cfg"
-var context_ik_marker: MeshInstance3D
+var context_ik_markers := {}
 var context_ik_key := ""
 var context_ik_weight := 0.0
 var support_enabled: CheckButton
@@ -939,7 +942,7 @@ func _refresh_equipped_scale() -> void:
 	equipped_scale_label.text = "Tamanho do equipamento: %.0f%%" % percent
 
 func _load_scene(index: int) -> void:
-	context_solver.clear()
+	_clear_context_solvers()
 	support_solver.clear()
 	_clear_all_equipment()
 	skeleton = null
@@ -1276,6 +1279,8 @@ func _set_mode(index: int) -> void:
 		_replay()
 
 func _choose_context(index: int) -> void:
+	_clear_context_solvers()
+	_reset_warp_frame()
 	if is_instance_valid(context_root):
 		remove_child(context_root)
 		context_root.queue_free()
@@ -1408,6 +1413,8 @@ func _set_speed(index: int) -> void:
 		player.speed_scale = playback_speed
 
 func _replay() -> void:
+	_suspend_context_solvers("replay")
+	_reset_warp_frame()
 	if not is_instance_valid(player) or selected_clip == &"":
 		return
 	player.stop()
@@ -1847,7 +1854,7 @@ func _reset_support() -> void:
 func _update_support() -> void:
 	if not is_instance_valid(support_enabled):
 		return
-	if context_solver.state == "active":
+	if context_active_count > 0:
 		support_solver.suspend("context_priority")
 		support_status.text = "Pausa durante o contato com objeto de contexto."
 		_show_support_marker(false)
@@ -1917,6 +1924,11 @@ func _create_context_ik_ui(parent: VBoxContainer) -> void:
 	context_ik_enabled.text = "Corrigir contato durante a fase"
 	parent.add_child(context_ik_enabled)
 	context_ik_enabled.toggled.connect(func(_value): _update_context_ik())
+	context_multi = CheckButton.new()
+	context_multi.text = "Aplicar todos os contatos registrados"
+	context_multi.button_pressed = true
+	parent.add_child(context_multi)
+	context_multi.toggled.connect(func(_value): _update_context_ik())
 	var nearest := Button.new()
 	nearest.text = "Capturar superfície mais próxima"
 	parent.add_child(nearest)
@@ -1954,13 +1966,17 @@ func _create_context_ik_ui(parent: VBoxContainer) -> void:
 	_create_warp_ui(parent)
 
 func _context_ik_data() -> Dictionary:
-	if item_mode or not is_instance_valid(skeleton) or not is_instance_valid(context_root) or context_root.get_child_count() < 2 or contact_picker.selected < 0:
+	if not is_instance_valid(contact_picker) or contact_picker.selected < 0:
 		return {}
-	var bone := contact_picker.get_selected_id()
+	return _context_data_for_bone(contact_picker.get_selected_id())
+
+func _context_data_for_bone(bone: int) -> Dictionary:
+	if item_mode or not is_instance_valid(skeleton) or not is_instance_valid(context_root) or context_root.get_child_count() < 2 or context_record_index < 0 or scene_picker.selected < 0:
+		return {}
 	if bone < 0 or bone >= skeleton.get_bone_count():
 		return {}
 	var name := str(skeleton.get_bone_name(bone))
-	if ("hand" not in name.to_lower() and "foot" not in name.to_lower()) or ContactIK.chain(skeleton, bone).size() != 3:
+	if not ContactIK.is_contact_tip(name) or ContactIK.chain(skeleton, bone).size() != 3:
 		return {}
 	# Do not solve an equipped limb to an unrelated context surface.
 	for slot in [0, 1]:
@@ -1988,8 +2004,13 @@ func _capture_context_ik(top: bool) -> void:
 	var data := _context_ik_data()
 	if data.is_empty():
 		return
-	context_solver.suspend("calibration")
+	_suspend_context_solvers("calibration")
 	support_solver.suspend("calibration")
+	_reset_warp_frame()
+	if is_instance_valid(player) and _clip_length() > 0.0:
+		var time := player.current_animation_position
+		player.pause()
+		player.seek(time, true)
 	var collision: CollisionShape3D = data["shape"]
 	var half: Vector3 = data["half"]
 	var bone: int = data["bone"]
@@ -2008,63 +2029,137 @@ func _remove_context_ik() -> void:
 		_save_context_ik_profiles()
 	_update_context_ik()
 
+func _clear_context_solvers() -> void:
+	for solver in context_solvers.values():
+		solver.clear()
+	context_solvers.clear()
+	for marker in context_ik_markers.values():
+		if is_instance_valid(marker):
+			marker.queue_free()
+	context_ik_markers.clear()
+	context_active_count = 0
+	context_contacts.clear()
+
+func _suspend_context_solvers(reason: String) -> void:
+	for solver in context_solvers.values():
+		if solver.state == "active":
+			solver.suspend(reason)
+	context_active_count = 0
+
 func _update_context_ik() -> void:
 	if not is_instance_valid(context_ik_enabled):
 		return
 	_reset_warp_frame()
 	context_ik_weight = 0.0
 	context_ik_key = ""
-	if is_instance_valid(context_ik_marker):
-		context_ik_marker.hide()
-	if not context_ik_enabled.button_pressed:
-		context_solver.suspend("disabled")
-		context_ik_label.text = "Correção desativada."
+	context_active_count = 0
+	context_contacts.clear()
+	for marker in context_ik_markers.values():
+		if is_instance_valid(marker):
+			marker.hide()
+	if not context_ik_enabled.button_pressed or item_mode or not is_instance_valid(skeleton) or not is_instance_valid(context_root):
+		_suspend_context_solvers("disabled")
+		context_ik_label.text = "Correção desativada." if not context_ik_enabled.button_pressed else "Selecione um personagem e objeto."
 		return
-	var data := _context_ik_data()
-	if data.is_empty():
-		context_solver.suspend("no_context")
-		context_ik_label.text = "Escolha um objeto e uma mão ou pé livre compatível."
-		return
-	context_ik_key = str(data["key"])
-	if not context_ik_profiles.has(context_ik_key):
-		context_solver.suspend("no_anchor")
-		context_ik_label.text = "Capture uma superfície na fase de contato."
-		return
-	var profile: Dictionary = context_ik_profiles[context_ik_key]
-	var collision: CollisionShape3D = data["shape"]
-	var half: Vector3 = data["half"]
-	var anchor: Vector3 = profile["anchor"]
-	var goal := collision.to_global(anchor * half)
-	_show_context_ik_marker(goal)
-	context_ik_weight = ContextGeometry.phase_weight(_context_ik_phase(), float(profile["phase"]), float(profile["span"]))
-	if context_ik_weight <= 0.001:
-		context_solver.suspend("outside_phase")
-		context_ik_label.text = "Fora da janela de contato."
+	var selected := _context_ik_data()
+	context_ik_key = str(selected.get("key", ""))
+	var candidates: Array = []
+	if context_multi.button_pressed:
+		for bone in range(skeleton.get_bone_count()):
+			if ContactIK.is_contact_tip(str(skeleton.get_bone_name(bone))):
+				var data := _context_data_for_bone(bone)
+				if not data.is_empty():
+					candidates.append(data)
+	elif not selected.is_empty():
+		candidates.append(selected)
+	var active: Array = []
+	var seen := {}
+	var offsets := PackedVector3Array()
+	var weights := PackedFloat32Array()
+	var registered := 0
+	for data in candidates:
+		var key: String = data["key"]
+		if not context_ik_profiles.has(key):
+			continue
+		registered += 1
+		var profile: Dictionary = context_ik_profiles[key]
+		var collision: CollisionShape3D = data["shape"]
+		var half: Vector3 = data["half"]
+		var anchor: Vector3 = profile["anchor"]
+		var bone: int = data["bone"]
+		var goal := collision.to_global(anchor * half)
+		var weight := ContextGeometry.phase_weight(_context_ik_phase(), float(profile["phase"]), float(profile["span"]))
+		_show_context_ik_marker(bone, goal, weight > 0.001)
+		if weight <= 0.001:
+			continue
+		# Distinct arm/leg chains only; do not double-solve overlapping bones.
+		var chain := ContactIK.chain(skeleton, bone)
+		var conflict := false
+		for id in chain:
+			if seen.has(id):
+				conflict = true
+		if conflict:
+			continue
+		for id in chain:
+			seen[id] = true
+		data["goal"] = goal
+		data["weight"] = weight
+		active.append(data)
+		context_ik_weight = maxf(context_ik_weight, weight)
+		var tip := skeleton.to_global(skeleton.get_bone_global_pose(bone).origin)
+		offsets.append(BodyWarp.proposed_offset(tip, goal, 1.0, warp_limit.value / 100.0, warp_axis.selected))
+		weights.append(weight)
+		if active.size() >= 4:
+			break
+	var wanted := {}
+	for data in active:
+		wanted[int(data["bone"])] = true
+	for id in context_solvers:
+		if not wanted.has(id) and context_solvers[id].state == "active":
+			context_solvers[id].suspend("outside_phase")
+	if active.is_empty():
+		context_ik_label.text = "Fora das janelas de contato (%d registrados)." % registered if registered > 0 else "Capture a superfície de cada mão ou pé."
 		return
 	support_solver.suspend("context_priority")
-	_apply_body_warp(data, goal)
-	context_solver.apply(skeleton, int(data["bone"]), goal, context_ik_weight)
-	if context_solver.state == "active":
-		context_ik_label.text = "Caixa aproximada | influência %.0f%% | erro %.1f → %s cm" % [context_ik_weight * 100.0, context_solver.before_cm, "%.1f" % context_solver.after_cm if context_solver.after_cm >= 0.0 else "medindo"]
-	elif context_solver.state == "out_of_reach":
-		context_ik_label.text = "Superfície fora do alcance; correção suspensa."
-	else:
-		context_ik_label.text = "Rig não suportado."
+	var proposed := BodyWarp.compromise(offsets, weights, warp_limit.value / 100.0)
+	var first: Dictionary = active[0]
+	var first_goal: Vector3 = first["goal"]
+	_apply_body_warp(first, first_goal, proposed)
+	var lines := PackedStringArray()
+	for data in active:
+		var bone: int = data["bone"]
+		var goal: Vector3 = data["goal"]
+		var weight: float = data["weight"]
+		if not context_solvers.has(bone):
+			context_solvers[bone] = ContactIK.new()
+		var solver = context_solvers[bone]
+		solver.apply(skeleton, bone, goal, weight)
+		if solver.state == "active":
+			context_active_count += 1
+		var name := str(skeleton.get_bone_name(bone))
+		var label := Labels.bone(name, bone)
+		var status_text := "fora do alcance" if solver.state == "out_of_reach" else ("%.1f → %s cm" % [solver.before_cm, "%.1f" % solver.after_cm if solver.after_cm >= 0.0 else "medindo"] if solver.state == "active" else "indisponível")
+		lines.append("%s: %s (%.0f%%)" % [label, status_text, weight * 100.0])
+		context_contacts.append({"profile": data["key"], "bone": name, "weight": weight, "state": solver.state, "beforeCm": solver.before_cm, "afterCm": solver.after_cm, "goal": _vjson(goal)})
+	context_ik_label.text = "%d/%d contatos ativos | caixa aproximada\n%s" % [context_active_count, registered, "\n".join(lines)]
 
-func _show_context_ik_marker(goal: Vector3) -> void:
-	if not is_instance_valid(context_ik_marker):
-		context_ik_marker = MeshInstance3D.new()
+func _show_context_ik_marker(bone: int, goal: Vector3, active: bool) -> void:
+	if not context_ik_markers.has(bone) or not is_instance_valid(context_ik_markers[bone]):
+		var marker := MeshInstance3D.new()
 		var sphere := SphereMesh.new()
 		sphere.radius = 0.018
 		sphere.height = 0.036
-		context_ik_marker.mesh = sphere
+		marker.mesh = sphere
 		var mat := StandardMaterial3D.new()
-		mat.albedo_color = Color(1.0, 0.65, 0.1)
 		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		context_ik_marker.material_override = mat
-		add_child(context_ik_marker)
-	context_ik_marker.global_position = goal
-	context_ik_marker.show()
+		marker.material_override = mat
+		add_child(marker)
+		context_ik_markers[bone] = marker
+	var marker: MeshInstance3D = context_ik_markers[bone]
+	var mat := marker.material_override as StandardMaterial3D
+	mat.albedo_color = Color(1.0, 0.65, 0.1) if active else Color(0.45, 0.45, 0.45)
+	marker.global_position = goal
+	marker.show()
 
 func _save_context_ik_profiles() -> void:
 	var cfg := ConfigFile.new()
@@ -2082,7 +2177,7 @@ func _load_context_ik_profiles() -> void:
 			context_ik_profiles[key] = p
 
 func _context_ik_snapshot() -> Dictionary:
-	return {"enabled": context_ik_enabled.button_pressed, "profile": context_ik_key, "backend": "godot_fabrik", "state": context_solver.state, "weight": context_ik_weight, "beforeCm": context_solver.before_cm, "afterCm": context_solver.after_cm}
+	return {"enabled": context_ik_enabled.button_pressed, "multi": context_multi.button_pressed, "profile": context_ik_key, "backend": "godot_fabrik", "state": "active" if context_active_count > 0 else "inactive", "weight": context_ik_weight, "activeCount": context_active_count, "contacts": context_contacts.duplicate(true)}
 
 func _context_ik_export() -> Dictionary:
 	var result := {}
@@ -2139,14 +2234,14 @@ func _reset_warp_frame() -> void:
 	if is_instance_valid(warp_label):
 		warp_label.text = "Sem deslocamento do corpo nesta fase."
 
-func _apply_body_warp(data: Dictionary, goal: Vector3) -> void:
+func _apply_body_warp(data: Dictionary, goal: Vector3, proposed: Variant = null) -> void:
 	if not is_instance_valid(warp_enabled) or not warp_enabled.button_pressed or not is_instance_valid(warp_root):
 		return
 	var collision: CollisionShape3D = data["shape"]
 	var half: Vector3 = data["half"]
 	var bone: int = data["bone"]
 	var tip := skeleton.to_global(skeleton.get_bone_global_pose(bone).origin)
-	warp_requested = BodyWarp.proposed_offset(tip, goal, context_ik_weight, warp_limit.value / 100.0, warp_axis.selected)
+	warp_requested = proposed if proposed is Vector3 else BodyWarp.proposed_offset(tip, goal, context_ik_weight, warp_limit.value / 100.0, warp_axis.selected)
 	if warp_requested.is_zero_approx():
 		warp_state = "aligned"
 		warp_label.text = "Sem necessidade de deslocamento."

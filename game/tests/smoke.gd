@@ -412,7 +412,7 @@ func _run() -> void:
 	# Programmatic assignment does not guarantee TextEdit.text_changed; mirror explicit UI save.
 	lab._save_reviews()
 	var report: Variant = JSON.parse_string(lab._report_json())
-	if not report is Dictionary or report["reviews"].size() != 1 or report["reviews"][0]["notes"] != "Teste de encaixe: mão esquerda" or report["current"]["notes"] != "Observação atual" or report["build"] != "0.1.0-alpha.16" or not report["current"].has("bodyWarp") or not report.has("bodyWarpProfiles") or not report["current"].has("contextIK") or not report.has("contextContactProfiles") or not report["current"].has("supportIK") or not report.has("supportProfiles"):
+	if not report is Dictionary or report["reviews"].size() != 1 or report["reviews"][0]["notes"] != "Teste de encaixe: mão esquerda" or report["current"]["notes"] != "Observação atual" or report["build"] != "0.1.0-alpha.17" or not report["current"]["contextIK"].has("contacts") or not report["current"].has("bodyWarp") or not report.has("bodyWarpProfiles") or not report["current"].has("contextIK") or not report.has("contextContactProfiles") or not report["current"].has("supportIK") or not report.has("supportProfiles"):
 		push_error("Review JSON failed")
 		quit(1)
 		return
@@ -454,6 +454,11 @@ func _run() -> void:
 		quit(1)
 		return
 	print("BODY_WARP_OK: bounded translation, axis filter, swept box guard, wrapper and reset.")
+	if not await _test_multi_contact():
+		push_error("Multi-contact test failed")
+		quit(1)
+		return
+	print("MULTI_CONTACT_OK: independent limb solvers, weighted root compromise and exact tip guard.")
 	quit(0)
 
 func _test_support_ik() -> bool:
@@ -539,4 +544,39 @@ func _test_body_warp() -> bool:
 	ok = ok and blocked > 0.18 and blocked < 0.21
 	ok = ok and is_zero_approx(w.safe_fraction(PackedVector3Array([Vector3.ZERO]), Vector3(2, 0, 0), half, 0.1))
 	ok = ok and is_zero_approx(w.safe_fraction(PackedVector3Array(), Vector3(2, 0, 0), half, 0.1))
+	return ok
+
+func _test_multi_contact() -> bool:
+	var w = preload("res://lab/body_warp.gd")
+	var ik = preload("res://lab/contact_ik.gd")
+	var offsets := PackedVector3Array([Vector3(0.2, 0, 0), Vector3(-0.2, 0, 0)])
+	var ok: bool = w.compromise(offsets, PackedFloat32Array([1.0, 1.0]), 0.4).is_zero_approx()
+	ok = ok and w.compromise(offsets, PackedFloat32Array([0.5, 0.0]), 0.4).is_equal_approx(Vector3(0.1, 0, 0))
+	ok = ok and ik.is_contact_tip("foot.L") and ik.is_contact_tip("mixamorig:RightHand") and not ik.is_contact_tip("RightHandIndex1")
+	var rig := Skeleton3D.new()
+	root.add_child(rig)
+	rig.add_bone("Root")
+	for side in ["Left", "Right"]:
+		var upper := rig.get_bone_count()
+		rig.add_bone(side + "UpperArm")
+		rig.add_bone(side + "LowerArm")
+		rig.add_bone(side + "Hand")
+		rig.set_bone_parent(upper, 0)
+		rig.set_bone_rest(upper, Transform3D(Basis.IDENTITY, Vector3(0, 0, 0.3 if side == "Left" else -0.3)))
+		for i in range(upper + 1, upper + 3):
+			rig.set_bone_parent(i, i - 1)
+			rig.set_bone_rest(i, Transform3D(Basis.IDENTITY, Vector3(0.3, 0, 0)))
+	rig.reset_bone_poses()
+	var left = ik.new()
+	var right = ik.new()
+	left.apply(rig, 3, Vector3(0.35, 0.25, 0.3), 1.0)
+	right.apply(rig, 6, Vector3(0.35, -0.25, -0.3), 1.0)
+	for i in range(5):
+		await process_frame
+	ok = ok and left.state == "active" and right.state == "active" and left.after_cm >= 0 and right.after_cm >= 0 and left.after_cm < 3 and right.after_cm < 3
+	left.suspend("test")
+	ok = ok and not left.ik.is_running() and right.ik.is_running()
+	left.clear()
+	right.clear()
+	rig.queue_free()
 	return ok
