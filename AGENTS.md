@@ -10,3 +10,6 @@ Nesta primeira etapa, mantenha uma única sala 3D compacta e persistente. Todos 
 
 ## Publicação Android
 Manter somente o APK mais recente aprovado nas Releases, nome MyGame-Lab-<versão>.apk. Preservar tags, histórico e notas. Remover APKs e checksums anteriores e artefatos CI redundantes apenas após publicação e verificação do novo APK. Não guardar APKs no histórico Git. Rebuilds de tags antigas devem usar artefato temporário, sem substituir a versão publicada.
+
+## Idioma da interface
+Exibir nomes de movimentos, peças, personagens, coleções e ossos em português brasileiro. Preservar integralmente IDs, nomes de clipes, ossos, caminhos e chaves técnicas originais; traduções em labels_pt.gd apenas para apresentação. Nomes sem tradução devem ser sinalizados em teste e receber rótulo em português, sem renomear os recursos.

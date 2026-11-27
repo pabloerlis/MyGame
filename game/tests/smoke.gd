@@ -254,6 +254,44 @@ func _run() -> void:
 		quit(1)
 		return
 	print("CONTEXT_OK: ", lab.context_indices.size(), " real props with approximate collision.")
+	var labels = preload("res://lab/labels_pt.gd")
+	var pending_clips := {}
+	var pending_bones := {}
+	for i in range(lab.records.size()):
+		lab._load_scene(i)
+		for j in range(lab.clips.size()):
+			var original: String = lab.clips[j]
+			var translated: String = labels.clip(original, j)
+			if "nome pendente" in translated:
+				pending_clips[original] = true
+			if lab.clip_picker.get_item_text(j) != translated:
+				push_error("Localized label mismatch")
+				quit(1)
+				return
+			lab._select_clip(j)
+			if lab.selected_clip != StringName(original) or not lab.player.has_animation(lab.selected_clip):
+				push_error("Localization changed animation key")
+				quit(1)
+				return
+		for j in range(lab.bone_picker.item_count):
+			var id: int = lab.bone_picker.get_item_id(j)
+			var original: String = str(lab.skeleton.get_bone_name(id))
+			var translated: String = labels.bone(original, id)
+			if "nome pendente" in translated:
+				pending_bones[original] = true
+			if lab.bone_picker.get_item_text(j) != translated:
+				push_error("Localized bone mismatch")
+				quit(1)
+				return
+		await process_frame
+	for i in range(lab.items.size()):
+		if "nome pendente" in labels.item(str(lab.items[i]["name"]), i):
+			push_error("Missing item translation")
+			quit(1)
+			return
+	print("LOCALIZATION_OK: 130 item labels; original clip and bone keys preserved.")
+	print("LOCALIZATION_PENDING_CLIPS: ", pending_clips.keys())
+	print("LOCALIZATION_PENDING_BONES: ", pending_bones.keys())
 	print("ITEMS_OK: ", lab.items.size(), " models; mode switch, navigation and actor restoration.")
 	print("SMOKE_OK: ", packs.size(), " packs; ", count, " imported clip variants.")
 	print("TRANSPORT_OK: ", navigation_checks, " scenes; wrap, sync, visibility, playback mode and speed.")

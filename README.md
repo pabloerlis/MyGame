@@ -2,7 +2,7 @@
 
 RPG 3D de ação, sobrevivência, exploração e progressão, com identidade própria e estética low-poly de fantasia. PC como plataforma-alvo do jogo final; Android como plataforma exclusiva de testes e entregas da etapa de laboratório; experiência offline; ferramentas e assets gratuitos. O projeto inicia pelo laboratório de validação, não pelo mundo do jogo.
 
-## Estado: 0.1.0-alpha.8 — inspeção temporal e diagnóstico de contato (CI pendente)
+## Estado: 0.1.0-alpha.9 — nomes em português (CI pendente)
 
 Novo modo de inspeção de 130 peças CC0 (106 RPG e 24 armas), com navegação circular e enquadramento automático. O APK mais recente aprovado está na página de Releases.
 

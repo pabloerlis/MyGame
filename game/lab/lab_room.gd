@@ -1,4 +1,5 @@
 extends Node3D
+const Labels = preload("res://lab/labels_pt.gd")
 ## Single-room inspector. Real imported scenes only; no synthetic character or clip.
 var records: Array = []
 var actor: Node3D
@@ -112,28 +113,29 @@ func _ready() -> void:
 		status.text = "Catálogo vazio ou inválido."
 		return
 	records = parsed
-	for record in records:
-		scene_picker.add_item(str(record["pack"]) + " | " + str(record["sourcePath"]).get_file())
+	for i in range(records.size()):
+		scene_picker.add_item(Labels.scene(records[i], i))
 	_load_scene(0)
 	var item_file := FileAccess.open("res://assets/runtime/items.json", FileAccess.READ)
 	if item_file != null:
 		var parsed_items: Variant = JSON.parse_string(item_file.get_as_text())
 		if parsed_items is Array:
 			items = parsed_items
-	for item in items:
-		item_picker.add_item(str(item["name"]) + " | " + ("RPG" if item["pack"] == "rpg_items_pack" else "Armas"))
+	for i in range(items.size()):
+		var item: Dictionary = items[i]
+		item_picker.add_item(Labels.item(str(item["name"]), i) + " | " + Labels.pack(str(item["pack"])))
 	for i in range(items.size()):
 		var record: Dictionary = items[i]
 		var name := str(record["name"]).to_lower()
 		if record["pack"] == "medieval_weapons_pack" or name.begins_with("sword") or name.begins_with("axe") or name.begins_with("bow") or name.begins_with("dagger") or name.begins_with("hammer"):
 			equipment_indices.append(i)
-			equipment_picker.add_item(str(record["name"]) + " | " + ("RPG" if record["pack"] == "rpg_items_pack" else "Armas"))
+			equipment_picker.add_item(Labels.item(str(record["name"]), i) + " | " + Labels.pack(str(record["pack"])))
 	for i in range(items.size()):
 		var record: Dictionary = items[i]
 		var name := str(record["name"]).to_lower()
 		if record["pack"] == "rpg_items_pack" and (name.begins_with("chest") or name.begins_with("mineral") or name.begins_with("crystal") or name.begins_with("book")):
 			context_indices.append(i)
-			context_picker.add_item(str(record["name"]))
+			context_picker.add_item(Labels.item(str(record["name"]), i))
 	context_toggle.disabled = context_indices.is_empty()
 	mode_picker.set_item_disabled(1, items.is_empty())
 	equipment_toggle.disabled = equipment_indices.is_empty() or not is_instance_valid(skeleton)
@@ -233,7 +235,7 @@ func _create_ui() -> void:
 	var row := HBoxContainer.new()
 	animation_controls.add_child(row)
 	loop_toggle = CheckButton.new()
-	loop_toggle.text = "Loop"
+	loop_toggle.text = "Repetir"
 	loop_toggle.button_pressed = true
 	row.add_child(loop_toggle)
 	loop_toggle.toggled.connect(func(_value): _replay())
@@ -410,7 +412,7 @@ func _load_scene(index: int) -> void:
 	var record: Dictionary = records[index]
 	var packed: Resource = load(str(record["path"]))
 	if not packed is PackedScene:
-		status.text = "Falha ao importar asset"
+		status.text = "Falha ao importar modelo"
 		return
 	var node: Node = packed.instantiate()
 	if not node is Node3D:
@@ -424,15 +426,15 @@ func _load_scene(index: int) -> void:
 	equipment_toggle.disabled = equipment_indices.is_empty() or not is_instance_valid(skeleton)
 	player = _find_player(actor)
 	if player == null:
-		status.text = "Sem AnimationPlayer"
+		status.text = "Sem animações importadas"
 		return
 	clips = player.get_animation_list()
 	player.speed_scale = playback_speed
 	for clip in clips:
-		clip_picker.add_item(clip)
+		clip_picker.add_item(Labels.clip(clip, clip_picker.item_count))
 		original_modes[clip] = player.get_animation(clip).loop_mode
 	status.text = "%s movimentos" % clips.size()
-	details.text = str(record["pack"]) + " • CC0"
+	details.text = Labels.pack(str(record["pack"])) + " • CC0"
 	if not clips.is_empty():
 		var start := 0
 		for i in range(clips.size()):
@@ -474,8 +476,8 @@ func _populate_bones() -> void:
 		else:
 			others.append(i)
 	for i in hands + others:
-		bone_picker.add_item(str(skeleton.get_bone_name(i)), i)
-		contact_picker.add_item(str(skeleton.get_bone_name(i)), i)
+		bone_picker.add_item(Labels.bone(str(skeleton.get_bone_name(i)), i), i)
+		contact_picker.add_item(Labels.bone(str(skeleton.get_bone_name(i)), i), i)
 	_select_default_bone()
 	if bone_picker.selected >= 0:
 		contact_picker.select(bone_picker.selected)
@@ -634,7 +636,7 @@ func _reset_grip() -> void:
 
 func _update_grip_label() -> void:
 	if is_instance_valid(grip):
-		equip_label.text = "%s | P %.2f %.2f %.2f m | R %.0f %.0f %.0f°" % [attachment.bone_name, grip.position.x, grip.position.y, grip.position.z, grip.rotation_degrees.x, grip.rotation_degrees.y, grip.rotation_degrees.z] + profile_status
+		equip_label.text = "%s | P %.2f %.2f %.2f m | R %.0f %.0f %.0f°" % [Labels.bone(str(attachment.bone_name), attachment.bone_idx), grip.position.x, grip.position.y, grip.position.z, grip.rotation_degrees.x, grip.rotation_degrees.y, grip.rotation_degrees.z] + profile_status
 
 func _find_player(node: Node) -> AnimationPlayer:
 	if node is AnimationPlayer:
@@ -667,12 +669,12 @@ func _update_transport() -> void:
 	if item_mode:
 		previous_button.disabled = items.size() < 2
 		next_button.disabled = items.size() < 2
-		clip_caption.text = "%d/%d\n%s" % [item_index + 1, items.size(), items[item_index]["name"]] if item_index >= 0 else "—"
+		clip_caption.text = "%d/%d\n%s" % [item_index + 1, items.size(), Labels.item(str(items[item_index]["name"]), item_index)] if item_index >= 0 else "—"
 		return
 	var available := clip_index >= 0 and clip_index < clips.size()
 	previous_button.disabled = not available or clips.size() < 2
 	next_button.disabled = not available or clips.size() < 2
-	clip_caption.text = "%d/%d\n%s" % [clip_index + 1, clips.size(), selected_clip] if available else "—"
+	clip_caption.text = "%d/%d\n%s" % [clip_index + 1, clips.size(), Labels.clip(str(selected_clip), clip_index)] if available else "—"
 
 func _set_mode(index: int) -> void:
 	var new_mode := index == 1
@@ -804,7 +806,7 @@ func _load_item(index: int) -> void:
 	focus = item_focus
 	distance = item_distance
 	status.text = "%d peças" % items.size()
-	details.text = str(record["name"]) + " | " + str(record["pack"]) + " | CC0"
+	details.text = Labels.item(str(record["name"]), index) + " | " + Labels.pack(str(record["pack"])) + " | CC0"
 	_update_camera()
 	_update_transport()
 
@@ -832,7 +834,7 @@ func _replay() -> void:
 	animation.loop_mode = Animation.LOOP_LINEAR if loop_toggle.button_pressed else Animation.LOOP_NONE
 	player.play(selected_clip)
 	player.seek(0.0, true)
-	details.text = "%s | %.2f s | %d tracks" % [selected_clip, animation.length, animation.get_track_count()]
+	details.text = "%s | %.2f s | %d trilhas" % [Labels.clip(str(selected_clip), clip_index), animation.length, animation.get_track_count()]
 
 func _process(delta: float) -> void:
 	diagnostics_elapsed += delta
@@ -900,7 +902,7 @@ func _update_inspection() -> void:
 		contact_label.text = "Colisor indisponível"
 		return
 	var description := "fora" if gap > CONTACT_TOLERANCE else ("dentro" if gap < -CONTACT_TOLERANCE else "próximo")
-	contact_label.text = "%s: %.1f cm (%s) | caixa aproximada" % [skeleton.get_bone_name(bone), gap * 100.0, description]
+	contact_label.text = "%s: %.1f cm (%s) | caixa aproximada" % [Labels.bone(str(skeleton.get_bone_name(bone)), bone), gap * 100.0, description]
 
 func _update_camera() -> void:
 	camera.position = focus + Vector3(sin(yaw)*cos(pitch), sin(pitch), cos(yaw)*cos(pitch))*distance

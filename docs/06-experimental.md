@@ -46,3 +46,6 @@ Adiciona objetos existentes (baús, minerais, cristais, livros) à sala junto ao
 
 ## 0.1.0-alpha.8 — inspeção temporal e distância de contato
 Painel recolhível Tempo/contato: fase normalizada, tempo em segundos, pausa ao selecionar fase, avanço/retrocesso em incrementos temporais de 1/60 s (não frames nativos do clipe). Escolha de osso real e distância assinada do ponto de origem do osso à caixa aproximada do objeto (positivo fora, negativo dentro, faixa de proximidade ±2 cm). Atualização a 10 Hz quando painel visível. Não é teste de contato entre superfícies, IK nem correção automática; origem do osso pode estar longe da superfície da mão/pé. Testes de distância da caixa, pausa, seek, passo e replay. CI pendente.
+
+## 0.1.0-alpha.9 — nomes em português
+Camada labels_pt.gd separada dos recursos e chaves técnicas: nomes das 130 peças, movimentos, coleções e ossos traduzidos para pt-BR. IDs originais continuam intactos para reprodução, vínculos, perfis e arquivos. Teste valida todos os itens e compara rótulos dos clipes/ossos sem modificar IDs; lista eventuais lacunas de tradução na CI. Nomes não reconhecidos recebem rótulo numerado em português até revisão. Validação CI e física pendentes.
