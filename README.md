@@ -2,9 +2,9 @@
 
 RPG 3D de ação, sobrevivência, exploração e progressão, com identidade própria e estética low-poly de fantasia. PC como plataforma-alvo do jogo final; Android como plataforma exclusiva de testes e entregas da etapa de laboratório; experiência offline; ferramentas e assets gratuitos. O projeto inicia pelo laboratório de validação, não pelo mundo do jogo.
 
-## Estado: 0.0.1 — concepção e documentação
+## Estado: 0.1.0-alpha.1 — código experimental inicial
 
-Nenhum APK, asset importado ou benchmark foi produzido nesta etapa. O laboratório deverá se tornar a fundação reutilizável do jogo.
+Sala única e importação de bibliotecas de animação implementadas em código. Aquisição, importação real, testes e APK dependem de execução confirmada da CI. Equipamentos, roupas e catálogo ampliado ainda pendentes. Consulte [estado experimental](docs/06-experimental.md).
 
 ## Documentação
 
