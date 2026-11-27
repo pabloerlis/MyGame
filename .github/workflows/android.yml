@@ -119,7 +119,41 @@ jobs:
           with open(os.environ["GITHUB_ENV"], "a") as env:
               env.write(f"LAB_VERSION={version}\nAPK_NAME=MyGame-Lab-{version}.apk\n")
           PY
+      - name: Resolve stable shell fingerprint
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 tools/shell_fingerprint.py > build/shell-fingerprint.txt
+          if gh release view lab-shell-v1 --json assets > build/shell-release.json 2>/dev/null; then
+            gh release download lab-shell-v1 --pattern shell-fingerprint.txt --dir /tmp
+            cmp /tmp/shell-fingerprint.txt build/shell-fingerprint.txt
+            python3 - <<'PY'
+          import json
+          assets=json.load(open("build/shell-release.json"))["assets"]
+          assert any(a["name"].endswith(".apk") and a["size"] > 0 for a in assets)
+          PY
+            echo "BUILD_SHELL=false" >> "$GITHUB_ENV"
+          else
+            echo "BUILD_SHELL=true" >> "$GITHUB_ENV"
+          fi
+      - name: Export and verify content pack
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '{"abi":1,"version":"%s"}\n' "$LAB_VERSION" > game/assets/runtime/content-version.json
+          PACK_NAME="MyGame-content-$LAB_VERSION-$GITHUB_RUN_ID.pck"
+          echo "PACK_NAME=$PACK_NAME" >> "$GITHUB_ENV"
+          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy --path game --export-pack Android "$PWD/build/$PACK_NAME" 2>&1 | tee build/pack-export.log
+          test -s "build/$PACK_NAME"
+          if grep -E 'SCRIPT ERROR|Parse Error|^ERROR:' build/pack-export.log; then exit 1; fi
+          rm game/assets/runtime/content-version.json
+          export XDG_DATA_HOME="$(mktemp -d)"
+          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a godot --rendering-method gl_compatibility --audio-driver Dummy --path game --script res://tests/pack_boot.gd -- "$PWD/build/$PACK_NAME" 2>&1 | tee build/pack-boot.log
+          grep -q PACK_BOOT_OK build/pack-boot.log
+          if grep -E 'SCRIPT ERROR|Parse Error|^ERROR:' build/pack-boot.log; then exit 1; fi
+          printf '{"abi":1,"version":"%s"}\n' "$LAB_VERSION" > game/assets/runtime/content-version.json
       - name: Export and verify APK
+        if: env.BUILD_SHELL == 'true' || github.ref != 'refs/heads/main'
         shell: bash
         run: |
           set -o pipefail
@@ -144,14 +178,24 @@ jobs:
             build/*.apk
             build/SHA256SUMS.txt
           retention-days: 1
-      - name: Publish directly installable experimental APK
+      - name: Publish stable Android shell
+        if: success() && github.ref == 'refs/heads/main' && env.BUILD_SHELL == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create lab-shell-v1 "build/$APK_NAME" build/SHA256SUMS.txt build/shell-fingerprint.txt --target "$GITHUB_SHA" --prerelease --title "MyGame Lab Android — Runtime ABI 1" --notes "Install once. Validated content packs are distributed through lab-content-v1. Physical-device validation pending."
+          python3 tools/retain_latest_apk.py lab-shell-v1 "$APK_NAME"
+      - name: Publish validated content
         if: success() && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="lab-alpha-${GITHUB_RUN_ID}"
-          gh release create "$TAG" "build/$APK_NAME" build/SHA256SUMS.txt --target "$GITHUB_SHA" --prerelease --title "MyGame Lab $LAB_VERSION" --notes "Automated import, smoke test and signature verification passed. Android ARM64 debug build. Physical-device and visual validation pending. Only the newest validated APK is retained; older source tags remain."
-          python3 tools/retain_latest_apk.py "$TAG" "$APK_NAME"
+          set -euo pipefail
+          if ! gh release view lab-content-v1 >/dev/null 2>&1; then
+            gh release create lab-content-v1 --target "$GITHUB_SHA" --prerelease --title "MyGame Lab — Content ABI 1" --notes "Validated, versioned Godot Android PCK packages."
+          fi
+          gh release upload lab-content-v1 "build/$PACK_NAME"
+          python3 tools/retain_content.py "$PACK_NAME"
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

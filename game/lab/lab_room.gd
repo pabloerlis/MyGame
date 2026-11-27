@@ -1773,6 +1773,10 @@ func _create_review_ui(parent: VBoxContainer, root: Control) -> void:
 	add.text = "Registrar teste atual"
 	parent.add_child(add)
 	add.pressed.connect(_record_review)
+	var updates := Button.new()
+	updates.text = "Atualizações do laboratório"
+	parent.add_child(updates)
+	updates.pressed.connect(func(): get_tree().call_group("lab_runtime", "open_update_panel"))
 	var token_hint := Label.new()
 	token_hint.text = "Envio GitHub: token fine-grained do MyGame com Issues: Read and write. Só fica nesta sessão."
 	token_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
