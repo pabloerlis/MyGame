@@ -1,0 +1,33 @@
+# Laboratório Android — especificação e aceite
+
+## Experiência
+Retrato, espaço mínimo por ação, personagem com rosto original, fundo neutro, iluminação simples. Cena 3D ocupa a área principal. Menu recolhível de categorias: personagens, movimentos, equipamentos, objetos, interações e revisão. Busca e seleção imediata; modo loop ou único; no único mostrar botão Play. Controles avançados contextuais: pausa, velocidade, timeline, frame a frame, root motion, esqueleto/colisões. Câmera orbitável 360°, inclinação, pinça/zoom, reset, enquadramento frontal/lateral/traseiro, isométrico e terceira pessoa. Não sobrepor controles à cena; evitar rolagem desnecessária.
+
+## Matriz de capacidades
+| Área | Exemplos | Aceite |
+|---|---|---|
+| Personagem | Corpo, rosto, cabelo, criatura | Sem deformação, textura ausente ou escala incoerente |
+| Locomoção | Idle, caminhar, correr, oito direções, agachar, rastejar, salto, queda, rolar | Pés/solo coerentes, direção e deslocamento corretos |
+| Equipamento | Armas, escudos, capacete, armadura, botas, acessórios | Encaixe em mãos/costas/cintura; sem sobreposição relevante |
+| Combate | Ataque, combo, bloqueio, esquiva, impacto, morte | Arma acompanha empunhadura; contato/fase e colisão coerentes |
+| Interação | Escalar, transpor, abrir, colher, minerar, cortar, pescar, sentar, carregar | Objeto real no contexto; mãos/pés alcançam o alvo; não flutuar/atravessar |
+| Estruturas | Paredes, pisos, portas, móveis, ruínas, vegetação | Escala, pivôs, encaixe modular e colisão inspecionáveis |
+| Reprodução | Loop, one-shot, replay, busca, pausa, tempo | Sem replay indesejado, UI consistente, troca imediata |
+| Câmera | Todos os ângulos e zoom | Gestos responsivos, sem clipping impeditivo |
+
+A lista é alvo, não afirma disponibilidade de clips gratuitos. Ações sem animação ficam indisponíveis com motivo. Testar contexto com plataforma/objeto do tamanho correto; não deformar objeto arbitrariamente para mascarar erro. Usar anchors, IK, ajustes de root motion e perfis de contato quando necessário.
+
+## Revisão
+Estados: não avaliado, aprovado, necessita ajuste, reprovado. Persistência no armazenamento privado do app e exportação/importação via seletor de arquivos Android, sem acesso indiscriminado ao armazenamento. Identificador composto por personagem, rig, clip, ação, equipamento e contexto. Importação não destrutiva; versão de schema e data; preservar histórico em atualizações; revalidar quando asset/correção mudar.
+
+Exemplo de registro:
+```json
+{"schemaVersion":1,"build":"0.1.0","actorId":"actor.example","actionId":"climb","clipId":"clip.example","equipmentIds":[],"contextId":"ledge.example","phase":0.52,"camera":{"yaw":0.85,"pitch":0.3,"zoom":0.65},"verdict":"needs-adjustment","notes":"Pé não toca a plataforma.","reviewedAt":"2026-11-27T00:00:00Z"}
+```
+IDs e valores são ilustrativos, não resultados reais.
+
+## Diagnóstico
+FPS, frame time, draw calls, triângulos, tempo de carga, contagem de assets e memória quando mensurável. Objetivo inicial 60 FPS (16,7 ms/quadro), modo reduzido a 30 FPS. Medir p50/p95, consumo, aquecimento e estabilidade; não declarar resultado sem aparelho. Testar offline, instalação, troca de assets, pausa/retorno e exportação de revisão.
+
+## Gate
+Aprovação visual explícita do usuário das capacidades e combinações necessárias à primeira fase jogável; zero defeitos bloqueantes, sem lacunas ocultas. CI e testes de lógica não aprovam aparência. Lacunas devem ser corrigidas ou retiradas do escopo mediante aceite explícito.
