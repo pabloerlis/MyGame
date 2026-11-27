@@ -70,3 +70,9 @@ Run 46040185326 passou importação, testes de encaixe relativo, persistência, 
 
 ## 0.1.0-alpha.23 — encaixe da cadeira
 Feedback Android alpha.22: pistola aprovada visualmente; não alterar sua calibração. Cadeira desproporcional e deslocada. Inferir assento pelas superfícies horizontais do modelo original e direção pelo encosto; amostrar pose sentada do rig, priorizando idle da mesma biblioteca. Escala uniforme pelo contato estimado do quadril; posição fixa no chão e rotação pelo vetor quadril-joelhos. Ajustes manuais continuam relativos à calibração. Exportar metadados da referência no JSON e verificar âncora na CI. A espessura da pelve é aproximada; sem confirmação visual ou correção de penetração dos pés/encosto nesta etapa.
+
+### Validação física Android alpha.23
+Cadeira aprovada visualmente pelo usuário. Pistola aprovada na aparência geral, especialmente para câmera distante/isométrica; em close há desalinhamento do indicador e interpenetração da arma com a palma durante a animação. Não alterar a calibração automática aprovada sem teste comparativo. Perspectiva isométrica é hipótese de avaliação, não decisão definitiva de direção de câmera.
+
+## 0.1.0-alpha.24 — avaliação por câmera e calibração fina
+Adicionar preset ortográfico isométrico (azimute 45°, elevação aproximada 35,26°, zoom ajustável), retorno à perspectiva e close existente. Exportar modo de projeção no JSON. Adicionar passo opcional de 1 mm físico (compensação da escala do osso) e 1° para ajuste manual, mantendo passos anteriores por padrão. Preservar cadeira, escala, empunhadura e clips da alpha.23. Correção automática de dedos/palma continua pendente: exige referência de contato e avaliação de cada pose, não apenas um novo deslocamento fixo. CI verifica mudança de câmera sem alteração do encaixe e passo físico. Nenhuma aprovação visual presumida para alpha.24.

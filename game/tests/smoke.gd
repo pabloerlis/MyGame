@@ -713,7 +713,25 @@ func _test_gallery(lab) -> bool:
 			if not is_instance_valid(lab.grip) or not str(lab.selected_clip).to_lower().contains("pistol_idle"):
 				print("GALLERY_DIAG: selected=", lab.selected_clip, " expected=", entry["clip"], " attached=", is_instance_valid(lab.grip))
 				return false
+			var original: Transform3D = lab.grip.transform
+			lab._set_isometric_view()
+			if lab.camera.projection != Camera3D.PROJECTION_ORTHOGONAL or not is_equal_approx(lab.camera.size, 6.0) or not lab.grip.transform.is_equal_approx(original):
+				return false
 			lab._focus_equipment_demo()
+			if lab.camera.projection != Camera3D.PROJECTION_PERSPECTIVE:
+				return false
+			lab.axis_picker.select(0)
+			lab.fine_grip.button_pressed = true
+			var bone: int = lab.skeleton.find_bone(lab.attachment.bone_name)
+			var basis: Basis = (lab.skeleton.global_transform * lab.skeleton.get_bone_global_pose(bone)).basis
+			lab._adjust_grip(1)
+			var delta: Vector3 = lab.grip.position - original.origin
+			var physical: float = (basis * delta).length()
+			lab._adjust_grip(-1)
+			lab.fine_grip.button_pressed = false
+			if absf(physical - 0.001) > 0.0001:
+				return false
+			lab._reset_grip()
 			found = lab.distance < 3.6 and lab.focus.is_finite()
 			print("GALLERY_DIAG: pistol distance=", lab.distance, " focus=", lab.focus)
 			break

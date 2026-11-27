@@ -12,6 +12,8 @@ var demo_gallery: OptionButton
 var demo_entries: Array = []
 var demo_gallery_button: Button
 var demo_closeup: Button
+var isometric_view := false
+var fine_grip: CheckButton
 var demo_position_key := ""
 const ContactIK = preload("res://lab/contact_ik.gd")
 var support_solver = ContactIK.new()
@@ -446,6 +448,14 @@ func _create_ui() -> void:
 	demo_closeup.text = "Aproximar câmera do equipamento"
 	animation_controls.add_child(demo_closeup)
 	demo_closeup.pressed.connect(_focus_equipment_demo)
+	var iso := Button.new()
+	iso.text = "Câmera isométrica (teste de jogo)"
+	animation_controls.add_child(iso)
+	iso.pressed.connect(_set_isometric_view)
+	var normal := Button.new()
+	normal.text = "Câmera de inspeção (perspectiva)"
+	animation_controls.add_child(normal)
+	normal.pressed.connect(_set_perspective_view)
 	var align_demo := Button.new()
 	align_demo.text = "Alinhar objeto à pose atual (empurrar)"
 	animation_controls.add_child(align_demo)
@@ -512,6 +522,9 @@ func _create_ui() -> void:
 	bone_picker.fit_to_longest_item = false
 	_long_picker(equipment_controls, "Osso de encaixe", bone_picker)
 	bone_picker.item_selected.connect(func(_index): _choose_equipment(equipment_picker.selected))
+	fine_grip = CheckButton.new()
+	fine_grip.text = "Ajuste fino: 1 mm / 1°"
+	equipment_controls.add_child(fine_grip)
 	var adjust_row := HBoxContainer.new()
 	equipment_controls.add_child(adjust_row)
 	axis_picker = OptionButton.new()
@@ -1269,11 +1282,22 @@ func _adjust_grip(direction: int) -> void:
 		return
 	if axis < 3:
 		var offset := grip.position
-		offset[axis] += 0.01 * direction
+		var step := 0.01
+		if fine_grip.button_pressed:
+			# Convert the physical step to local bone units, including imported rig scale.
+			var bone := skeleton.find_bone(attachment.bone_name)
+			if bone < 0:
+				return
+			var world_basis := (skeleton.global_transform * skeleton.get_bone_global_pose(bone)).basis
+			var axis_scale := world_basis[axis].length()
+			if axis_scale <= 0.000001:
+				return
+			step = 0.001 / axis_scale
+		offset[axis] += step * direction
 		grip.position = offset
 	else:
 		var rotation_offset := grip.rotation_degrees
-		rotation_offset[axis - 3] += 15.0 * direction
+		rotation_offset[axis - 3] += (1.0 if fine_grip.button_pressed else 15.0) * direction
 		grip.rotation_degrees = rotation_offset
 	grip_source = "manual"
 	grip_profiles[active_profile] = grip.transform
@@ -1585,7 +1609,30 @@ func _update_inspection() -> void:
 	var description := "fora" if gap > CONTACT_TOLERANCE else ("dentro" if gap < -CONTACT_TOLERANCE else "próximo")
 	contact_label.text = "%s: %.1f cm (%s) | caixa aproximada" % [Labels.bone(str(skeleton.get_bone_name(bone)), bone), gap * 100.0, description]
 
+func _set_isometric_view() -> void:
+	if item_mode:
+		return
+	isometric_view = true
+	yaw = PI / 4.0
+	pitch = atan(1.0 / sqrt(2.0))
+	focus = Vector3(0, actor_height_m * 0.48, 0)
+	distance = 7.5
+	_update_camera()
+	_set_settings(false)
+
+func _set_perspective_view() -> void:
+	isometric_view = false
+	yaw = 0.65
+	pitch = 0.24
+	focus = item_focus if item_mode else Vector3(0, 1, 0)
+	distance = item_distance if item_mode else 4.0
+	_update_camera()
+	_set_settings(false)
+
 func _update_camera() -> void:
+	camera.projection = Camera3D.PROJECTION_ORTHOGONAL if isometric_view and not item_mode else Camera3D.PROJECTION_PERSPECTIVE
+	if camera.projection == Camera3D.PROJECTION_ORTHOGONAL:
+		camera.size = distance * 0.8
 	camera.position = focus + Vector3(sin(yaw)*cos(pitch), sin(pitch), cos(yaw)*cos(pitch))*distance
 	camera.look_at(focus)
 
@@ -1753,7 +1800,7 @@ func _snapshot() -> Dictionary:
 			equipped.append({"slot": slot, "itemId": items[idx]["id"], "category": EquipmentRules.category(str(items[idx]["name"])), "bone": str(attached.bone_name), "gripSource": grip_source if slot == active_slot else state.get("source", ""), "transform": _tjson(node.transform), "fitAnchorLocal": _vjson(node.get_meta("fit_anchor", Vector3.ZERO)), "fitTargetMeters": node.get_meta("fit_target_m", 0.0)})
 	var t := player.current_animation_position if is_instance_valid(player) else 0.0
 	var length := _clip_length()
-	return {"mode": "item" if item_mode else "actor", "sceneId": records[scene_picker.selected]["id"] if scene_picker.selected >= 0 and scene_picker.selected < records.size() else "", "clipId": str(selected_clip), "timeSeconds": t, "durationSeconds": length, "phase": t / length if length > 0.0 else 0.0, "loop": loop_toggle.button_pressed, "speed": playback_speed, "playing": is_instance_valid(player) and player.is_playing(), "equipment": equipped, "activeSlot": active_slot, "itemId": items[item_index]["id"] if item_index >= 0 and item_index < items.size() else "", "contextId": items[context_record_index]["id"] if context_record_index >= 0 else "", "contextOffset": _vjson(context_offset), "contactBone": str(skeleton.get_bone_name(contact_picker.get_selected_id())) if is_instance_valid(skeleton) and contact_picker.selected >= 0 else "", "camera": {"yaw": yaw, "pitch": pitch, "distance": distance, "focus": _vjson(focus)}, "menuTransparency": menu_transparency, "compatibleOnly": compatible_only.button_pressed, "autoAction": auto_action.button_pressed}
+	return {"mode": "item" if item_mode else "actor", "sceneId": records[scene_picker.selected]["id"] if scene_picker.selected >= 0 and scene_picker.selected < records.size() else "", "clipId": str(selected_clip), "timeSeconds": t, "durationSeconds": length, "phase": t / length if length > 0.0 else 0.0, "loop": loop_toggle.button_pressed, "speed": playback_speed, "playing": is_instance_valid(player) and player.is_playing(), "equipment": equipped, "activeSlot": active_slot, "itemId": items[item_index]["id"] if item_index >= 0 and item_index < items.size() else "", "contextId": items[context_record_index]["id"] if context_record_index >= 0 else "", "contextOffset": _vjson(context_offset), "contactBone": str(skeleton.get_bone_name(contact_picker.get_selected_id())) if is_instance_valid(skeleton) and contact_picker.selected >= 0 else "", "camera": {"projection": "orthographic" if camera.projection == Camera3D.PROJECTION_ORTHOGONAL else "perspective", "orthographicSize": camera.size, "yaw": yaw, "pitch": pitch, "distance": distance, "focus": _vjson(focus)}, "menuTransparency": menu_transparency, "compatibleOnly": compatible_only.button_pressed, "autoAction": auto_action.button_pressed}
 
 func _review_entry() -> Dictionary:
 	var entry := _snapshot()
@@ -2715,8 +2762,8 @@ func _choose_demo_gallery(index: int) -> void:
 	demo_gallery.select(index)
 	_select_clip(clip_number)
 	_set_settings(false)
-	focus = Vector3(0, 1, 0)
-	distance = 3.6
+	focus = Vector3(0, actor_height_m * 0.48, 0) if isometric_view else Vector3(0, 1, 0)
+	distance = 7.5 if isometric_view else 3.6
 	_update_camera()
 
 func _focus_equipment_demo() -> void:
@@ -2730,6 +2777,7 @@ func _focus_equipment_demo() -> void:
 	var bounds := boxes[0]
 	for i in range(1, boxes.size()):
 		bounds = bounds.merge(boxes[i])
+	isometric_view = false
 	focus = bounds.get_center()
 	distance = clampf(bounds.size.length() * 2.5, 0.45, 3.5)
 	_update_camera()
