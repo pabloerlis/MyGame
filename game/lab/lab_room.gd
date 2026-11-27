@@ -12,6 +12,17 @@ var demo_gallery: OptionButton
 var demo_entries: Array = []
 var demo_gallery_button: Button
 var demo_closeup: Button
+var quick_panel: PanelContainer
+var quick_body: VBoxContainer
+var quick_target: OptionButton
+var quick_notes: LineEdit
+var quick_status: Label
+var quick_before := {}
+var quick_token: LineEdit
+var quick_request: HTTPRequest
+var quick_outbox: Array = []
+var quick_pending_id := ""
+const QUICK_OUTBOX := "user://confirmed-feedback-v1.json"
 var isometric_view := false
 var fine_grip: CheckButton
 var demo_position_key := ""
@@ -224,6 +235,7 @@ func _ready() -> void:
 	_load_context_ik_profiles()
 	_load_warp_profiles()
 	_load_reviews()
+	_load_quick_outbox()
 	var file := FileAccess.open("res://assets/runtime/catalog.json", FileAccess.READ)
 	if file == null:
 		status.text = "Assets ausentes. Execute o pipeline de aquisição."
@@ -304,15 +316,9 @@ func _create_ui() -> void:
 	demo_gallery.hide()
 	demo_gallery.item_selected.connect(_choose_demo_gallery)
 	var reset := Button.new()
-	reset.text = "Câmera"
+	reset.text = "Editar"
 	top.add_child(reset)
-	reset.pressed.connect(func():
-		yaw = 0.65
-		pitch = 0.24
-		focus = item_focus if item_mode else Vector3(0, 1, 0)
-		distance = item_distance if item_mode else 4.0
-		_update_camera()
-	)
+	reset.pressed.connect(_open_quick_menu)
 	# Persistent transport: independent of the collapsible catalog.
 	var nav := PanelContainer.new()
 	root.add_child(nav)
@@ -344,6 +350,7 @@ func _create_ui() -> void:
 	next_button.disabled = true
 	nav_row.add_child(next_button)
 	next_button.pressed.connect(func(): _step_clip(1))
+	_create_quick_menu(root)
 	# Separate full-screen settings page. The 3D room is never reloaded.
 	catalog_panel = PanelContainer.new()
 	root.add_child(catalog_panel)
@@ -685,6 +692,8 @@ func _section_heading(parent: VBoxContainer, title: String, subtitle: String) ->
 	parent.add_child(hint)
 
 func _set_settings(open: bool) -> void:
+	if open and is_instance_valid(quick_panel):
+		quick_panel.hide()
 	var was_open := settings_open
 	settings_open = open
 	if not open:
@@ -1764,6 +1773,18 @@ func _create_review_ui(parent: VBoxContainer, root: Control) -> void:
 	add.text = "Registrar teste atual"
 	parent.add_child(add)
 	add.pressed.connect(_record_review)
+	var token_hint := Label.new()
+	token_hint.text = "Envio GitHub: token fine-grained do MyGame com Issues: Read and write. Só fica nesta sessão."
+	token_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	parent.add_child(token_hint)
+	quick_token = LineEdit.new()
+	quick_token.secret = true
+	quick_token.placeholder_text = "Token de sessão (opcional)"
+	parent.add_child(quick_token)
+	var send := Button.new()
+	send.text = "Enviar próxima edição confirmada"
+	parent.add_child(send)
+	send.pressed.connect(_send_quick_feedback)
 	var export := Button.new()
 	export.text = "Exportar JSON"
 	parent.add_child(export)
@@ -2893,3 +2914,226 @@ func _fit_seated_demo() -> void:
 	_apply_context_scale()
 	_refresh_scale_controls(1)
 	_replay()
+
+# Contextual mobile editing: preview in the room, explicit confirmation for transmission.
+func _create_quick_menu(root: Control) -> void:
+	quick_panel = PanelContainer.new()
+	root.add_child(quick_panel)
+	quick_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	quick_panel.offset_left = 12
+	quick_panel.offset_right = -12
+	quick_panel.offset_top = -400
+	quick_panel.offset_bottom = -16
+	var layout := VBoxContainer.new()
+	quick_panel.add_child(layout)
+	var header := HBoxContainer.new()
+	layout.add_child(header)
+	quick_target = OptionButton.new()
+	quick_target.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(quick_target)
+	quick_target.item_selected.connect(func(_index): _rebuild_quick_controls())
+	_quick_button(header, "Fechar", _close_quick_menu)
+	quick_body = VBoxContainer.new()
+	layout.add_child(quick_body)
+	quick_notes = LineEdit.new()
+	quick_notes.placeholder_text = "Observação (opcional)"
+	layout.add_child(quick_notes)
+	var actions := HBoxContainer.new()
+	layout.add_child(actions)
+	_quick_button(actions, "Mais opções", func():
+		_close_quick_menu()
+		_set_settings(true)
+	)
+	_quick_button(actions, "Confirmar", _confirm_quick_feedback)
+	quick_status = Label.new()
+	quick_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	layout.add_child(quick_status)
+	quick_panel.hide()
+	quick_request = HTTPRequest.new()
+	quick_request.timeout = 25.0
+	add_child(quick_request)
+	quick_request.request_completed.connect(_quick_response)
+
+func _quick_button(parent: Control, title: String, action: Callable) -> Button:
+	var button := Button.new()
+	button.text = title
+	button.custom_minimum_size.y = 62
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	parent.add_child(button)
+	button.pressed.connect(action)
+	return button
+
+func _open_quick_menu() -> void:
+	if quick_panel.visible:
+		_close_quick_menu()
+		return
+	quick_before = _review_entry()
+	quick_notes.text = ""
+	quick_target.clear()
+	quick_target.add_item("Câmera", 0)
+	if item_mode:
+		quick_target.add_item("Peça", 4)
+	else:
+		if is_instance_valid(player):
+			quick_target.add_item("Movimento", 1)
+		if is_instance_valid(grip):
+			quick_target.add_item("Equipamento", 2)
+		if is_instance_valid(context_root):
+			quick_target.add_item("Objeto", 3)
+	quick_target.select(0)
+	_rebuild_quick_controls()
+	quick_status.text = "%d confirmações pendentes" % quick_outbox.size()
+	hud_nav.hide()
+	quick_panel.show()
+
+func _close_quick_menu() -> void:
+	quick_panel.hide()
+	hud_nav.visible = not settings_open
+
+func _quick_row() -> HBoxContainer:
+	var row := HBoxContainer.new()
+	quick_body.add_child(row)
+	return row
+
+func _rebuild_quick_controls() -> void:
+	for child in quick_body.get_children():
+		quick_body.remove_child(child)
+		child.queue_free()
+	var target := quick_target.get_selected_id()
+	var row := _quick_row()
+	match target:
+		0:
+			_quick_button(row, "Zoom −", func(): _quick_zoom(1.2))
+			_quick_button(row, "Zoom +", func(): _quick_zoom(1.0 / 1.2))
+			row = _quick_row()
+			_quick_button(row, "Isométrica", func():
+				if not item_mode:
+					isometric_view = true
+					yaw = PI / 4.0
+					pitch = atan(1.0 / sqrt(2.0))
+					_update_camera()
+			)
+			_quick_button(row, "Perspectiva", func():
+				isometric_view = false
+				_update_camera()
+			)
+			_quick_button(row, "Enquadrar", func():
+				focus = item_focus if item_mode else Vector3(0, 1, 0)
+				distance = item_distance if item_mode else 4.0
+				_update_camera()
+			)
+		1:
+			_quick_button(row, "Pausar", func(): player.pause())
+			_quick_button(row, "Reproduzir", _replay)
+			row = _quick_row()
+			_quick_button(row, "− 1 quadro", _step_time.bind(-1))
+			_quick_button(row, "+ 1 quadro", _step_time.bind(1))
+		2, 3, 4:
+			var axis := OptionButton.new()
+			for label in (["X", "Y", "Z", "Rot. X", "Rot. Y", "Rot. Z"] if target == 2 else ["X", "Y", "Z"]):
+				axis.add_item(label)
+			row.add_child(axis)
+			axis.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			_quick_button(row, "−", _quick_nudge.bind(target, axis, -1))
+			_quick_button(row, "+", _quick_nudge.bind(target, axis, 1))
+			row = _quick_row()
+			_quick_button(row, "Tamanho −", _quick_scale.bind(target, 0.95))
+			_quick_button(row, "Tamanho +", _quick_scale.bind(target, 1.05))
+
+func _quick_zoom(factor: float) -> void:
+	distance = clampf(distance * factor, 0.15, 12.0)
+	_update_camera()
+
+func _quick_nudge(target: int, axis: OptionButton, direction: int) -> void:
+	if target == 2:
+		axis_picker.select(axis.selected)
+		fine_grip.button_pressed = true
+		_adjust_grip(direction)
+	elif target == 3:
+		context_axis.select(axis.selected)
+		_adjust_context(direction)
+	elif target == 4:
+		var picker: OptionButton = scale_controls[0]["axis"]
+		picker.select(axis.selected + 1)
+		var scale_now := _object_scale(item_index)
+		_set_object_scale(scale_now[axis.selected] * 100.0 + direction * 1.0, 0)
+
+func _quick_scale(target: int, factor: float) -> void:
+	if target == 2 and is_instance_valid(grip):
+		_set_equipped_scale(grip.scale.x * factor * 100.0)
+	elif target in [3, 4]:
+		var index := 1 if target == 3 else 0
+		var picker: OptionButton = scale_controls[index]["axis"]
+		picker.select(0)
+		var scale_now := _object_scale(_scale_record_index(index))
+		_set_object_scale(scale_now.x * factor * 100.0, index)
+
+func _load_quick_outbox() -> void:
+	if FileAccess.file_exists(QUICK_OUTBOX):
+		var value: Variant = JSON.parse_string(FileAccess.get_file_as_string(QUICK_OUTBOX))
+		if value is Array:
+			quick_outbox = value
+
+func _save_quick_outbox() -> bool:
+	var file := FileAccess.open(QUICK_OUTBOX, FileAccess.WRITE)
+	if file == null:
+		return false
+	file.store_string(JSON.stringify(quick_outbox))
+	file.close()
+	return true
+
+func _confirm_quick_feedback() -> void:
+	var after := _review_entry()
+	after["notes"] = quick_notes.text
+	var id := Crypto.new().generate_random_bytes(16).hex_encode()
+	var entry := {"schemaVersion": 1, "id": id, "before": quick_before.duplicate(true), "after": after}
+	quick_outbox.append(entry)
+	if not _save_quick_outbox():
+		quick_outbox.pop_back()
+		quick_status.text = "Falha ao salvar confirmação."
+		return
+	quick_before = after
+	quick_notes.text = ""
+	quick_status.text = "Confirmado. %d na fila." % quick_outbox.size()
+	if is_instance_valid(quick_token) and not quick_token.text.strip_edges().is_empty():
+		_send_quick_feedback()
+	else:
+		quick_status.text += " Configure o envio em Revisão."
+
+func _send_quick_feedback() -> void:
+	if not quick_pending_id.is_empty():
+		return
+	if quick_outbox.is_empty():
+		review_status.text = "Nenhuma confirmação pendente."
+		return
+	var token := quick_token.text.strip_edges()
+	if token.is_empty() or token.contains("\n") or token.contains("\r"):
+		review_status.text = "Informe um token válido na sessão."
+		return
+	var entry: Dictionary = quick_outbox[0]
+	var body := "Feedback confirmado no MyGame Lab. ID: " + str(entry["id"]) + "\n\n```json\n" + JSON.stringify(entry, "\t") + "\n```"
+	if body.length() > 60000:
+		review_status.text = "Feedback excede o limite da Issue. Preserve o JSON local."
+		return
+	var payload := JSON.stringify({"title": "Lab feedback " + str(entry["id"]), "body": body})
+	quick_pending_id = str(entry["id"])
+	var headers := PackedStringArray(["Authorization: Bearer " + token, "Accept: application/vnd.github+json", "Content-Type: application/json", "X-GitHub-Api-Version: 2022-11-28"])
+	var err := quick_request.request("https://api.github.com/repos/pabloerlis/MyGame/issues", headers, HTTPClient.METHOD_POST, payload)
+	if err != OK:
+		quick_pending_id = ""
+		review_status.text = "Falha de conexão. Confirmação mantida na fila."
+	else:
+		review_status.text = "Enviando confirmação…"
+
+func _quick_response(result: int, response_code: int, _headers: PackedStringArray, _body: PackedByteArray) -> void:
+	if result == HTTPRequest.RESULT_SUCCESS and response_code == 201 and not quick_outbox.is_empty() and str(quick_outbox[0]["id"]) == quick_pending_id:
+		var sent: Variant = quick_outbox.pop_front()
+		if _save_quick_outbox():
+			review_status.text = "Feedback recebido pelo GitHub. Restam %d." % quick_outbox.size()
+		else:
+			quick_outbox.push_front(sent)
+			review_status.text = "GitHub recebeu; falha ao atualizar fila local. Evite reenviar."
+	else:
+		review_status.text = "Envio não confirmado (HTTP %d). Mantido na fila." % response_code
+	quick_pending_id = ""
+	quick_status.text = review_status.text
