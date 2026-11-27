@@ -9,9 +9,12 @@
 | 0.3.0 | Contextos de contato, correções, revisão JSON persistente | Aprovação por ação/contexto |
 | 0.4.0 | Integração de combate, interação e múltiplos atores | Estabilidade e desempenho |
 | 1.0 laboratório | Capacidades necessárias validadas e pendências aceitas | Aprovação explícita do usuário |
-| Jogo | Protótipo jogável, mundo, progressão e demais sistemas | Só após gate do laboratório |
+| Transição PC | Exportar o mesmo núcleo, adaptar entrada/UI e perfis gráficos, verificar paridade | Só após gate do laboratório; testes próprios no PC |
+| Jogo | Protótipo jogável para PC, mundo, progressão e demais sistemas | Após aprovação do laboratório e transição de plataforma |
 
 ## CI prevista
+Durante toda a etapa de laboratório, somente APK Android como artefato executável entregue ao usuário. Testes headless do núcleo podem rodar no CI; não gerar builds PC nesta etapa. A exportação desktop e validação de paridade serão marcos futuros, sem duplicar o projeto.
+
 GitHub Actions com versão fixa do Godot e templates, JDK 17, Android SDK compatível e arm64-v8a. Rodar validação JSON e referências, licenças, hashes, importação headless, testes unitários de catálogo/action/equipamento/review e testes de cenas; exportar APK debug; verificar assinatura e hash; publicar artefato e notas. Cache de dependências dentro dos limites gratuitos. Não publicar chaves de assinatura. Definir assinatura persistente antes de releases que precisem atualização sobre instalação existente.
 
 ## Testes
