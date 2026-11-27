@@ -31,3 +31,6 @@ CI alpha.2 confirmada: [run 46002174709](https://github.com/pabloerlis/MyGame/ac
 
 ## 0.1.0-alpha.3 — inspeção de peças
 Acervo bloqueado por commit e hash Git de cada GLB: 106 modelos Ultimate RPG Pack e 24 Modular Weapons Pack (5.573.380 bytes de origem), CC0 conforme páginas oficiais. GLBs convertidos por trebeljahr/quaternius-showcase, não arquivos FBX/Blend originais. CI verifica integridade, retém GLBs no repositório e importa todos os modelos. Modo Peças na mesma sala, navegação circular pelas setas, enquadramento automático por limites sem alterar escala e restauração do ator/animação ao voltar. Inspeção isolada, não equipagem, colisão ou interação ainda. Teste físico e CI pendentes.
+
+## 0.1.0-alpha.4 — identificação de abertura
+Tela de boot nativa do Godot configurada com imagem tipográfica “P. Erlis”, fundo #111820 e letras claras. A mesma imagem serve como ícone padrão do aplicativo para evitar o ícone Godot, inclusive na abertura do sistema Android quando aplicável. Imagem de 256 × 256, tipografia DejaVu Sans rasterizada, sem distribuição da fonte. Sem espera artificial na inicialização. Mantidas as atribuições/licenças da engine e dos assets. CI e teste visual no dispositivo pendentes.

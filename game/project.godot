@@ -3,8 +3,14 @@ config_version=5
 
 [application]
 config/name="MyGame Lab"
-config/version="0.1.0-alpha.3"
+config/version="0.1.0-alpha.4"
 run/main_scene="res://lab/lab_room.tscn"
+config/icon="res://branding/erlis.png"
+boot_splash/show_image=true
+boot_splash/image="res://branding/erlis.png"
+boot_splash/bg_color=Color(0.06666667, 0.09411765, 0.1254902, 1)
+boot_splash/use_filter=true
+boot_splash/fullsize=false
 
 [display]
 window/size/viewport_width=540
