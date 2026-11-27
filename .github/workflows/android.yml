@@ -10,6 +10,7 @@ on:
       - ".github/workflows/android.yml"
 permissions:
   contents: write
+  actions: write
 concurrency:
   group: android-lab-main
   cancel-in-progress: false
@@ -93,6 +94,85 @@ jobs:
           LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a godot --rendering-method gl_compatibility --audio-driver Dummy --path game --script res://tests/smoke.gd 2>&1 | tee build/smoke.log
           grep -q SMOKE_OK build/smoke.log
           if grep -E 'SCRIPT ERROR|Parse Error|^ERROR:' build/smoke.log; then exit 1; fi
+      - name: Resolve versioned APK filename
+        run: |
+          python3 - <<'PY'
+          import os, pathlib, re
+          preset = pathlib.Path("game/export_presets.cfg").read_text()
+          project = pathlib.Path("game/project.godot").read_text()
+          version = re.search(r'^version/name="([0-9A-Za-z.-]+)"        shell: bash
+        run: |
+          set -o pipefail
+          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy --path game --export-debug Android "$PWD/build/$APK_NAME" 2>&1 | tee build/export.log
+          test -s "build/$APK_NAME"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify "build/$APK_NAME"
+          (cd build && sha256sum "$APK_NAME" > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: lab-validated-logs
+          path: |
+            build/*.log
+            game/assets/runtime/catalog.json
+            game/assets/runtime/items.json
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: success() && github.ref != 'refs/heads/main'
+        with:
+          name: lab-rebuild-APK
+          path: |
+            build/*.apk
+            build/SHA256SUMS.txt
+          retention-days: 1
+      - name: Publish directly installable experimental APK
+        if: success() && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="lab-alpha-${GITHUB_RUN_ID}"
+          gh release create "$TAG" "build/$APK_NAME" build/SHA256SUMS.txt --target "$GITHUB_SHA" --prerelease --title "MyGame Lab $LAB_VERSION" --notes "Automated import, smoke test and signature verification passed. Android ARM64 debug build. Physical-device and visual validation pending. Only the newest validated APK is retained; older source tags remain."
+          python3 tools/retain_latest_apk.py "$TAG" "$APK_NAME"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: lab-diagnostics
+          path: build/*.log
+          if-no-files-found: ignore
+, preset, re.M).group(1)
+          assert re.search(r'^config/version="([^"]+)"        shell: bash
+        run: |
+          set -o pipefail
+          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy --path game --export-debug Android "$PWD/build/MyGame-Lab.apk" 2>&1 | tee build/export.log
+          test -s build/MyGame-Lab.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify build/MyGame-Lab.apk
+          sha256sum build/MyGame-Lab.apk > build/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: MyGame-Lab-Android
+          path: |
+            build/MyGame-Lab.apk
+            build/SHA256SUMS.txt
+            build/*.log
+            game/assets/runtime/catalog.json
+          retention-days: 14
+      - name: Publish directly installable experimental APK
+        if: success() && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="lab-alpha-${GITHUB_RUN_ID}"
+          gh release create "$TAG" build/MyGame-Lab.apk build/SHA256SUMS.txt --target "$GITHUB_SHA" --prerelease --title "MyGame Lab experimental ${GITHUB_RUN_ID}" --notes "Automated import, smoke test and signature verification passed. Android ARM64 debug build. Physical-device and visual validation pending."
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: lab-diagnostics
+          path: build/*.log
+          if-no-files-found: ignore
+, project, re.M).group(1) == version
+          with open(os.environ["GITHUB_ENV"], "a") as env:
+              env.write(f"LAB_VERSION={version}\nAPK_NAME=MyGame-Lab-{version}.apk\n")
+          PY
       - name: Export and verify APK
         shell: bash
         run: |

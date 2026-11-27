@@ -197,6 +197,36 @@ func _run() -> void:
 	DirAccess.remove_absolute(lab.profile_path)
 	print("DUAL_GRIP_OK: ", equipment_checks, " rigs; independent slots and disk round-trip.")
 	print("EQUIPMENT_OK: ", equipment_checks, " rigs; attachment, calibration, playback and removal.")
+	if lab.context_indices.is_empty():
+		push_error("Missing context assets")
+		quit(1)
+		return
+	for i in range(1, lab.context_picker.item_count):
+		lab._choose_context(i)
+		if not is_instance_valid(lab.context_root) or lab.context_root.get_child_count() != 2 or not lab.context_root.get_child(1) is StaticBody3D:
+			push_error("Context missing real model or static collision")
+			quit(1)
+			return
+		lab.context_axis.select(0)
+		lab._adjust_context(1)
+		if not is_equal_approx(lab.context_root.position.x, 0.05):
+			push_error("Context adjustment failed")
+			quit(1)
+			return
+		lab._reset_context()
+		await process_frame
+	var previous_context: Node3D = lab.context_root
+	lab.next_button.pressed.emit()
+	if lab.context_root != previous_context:
+		push_error("Context lost on clip switch")
+		quit(1)
+		return
+	lab._choose_context(0)
+	if lab.context_root != null:
+		push_error("Context cleanup failed")
+		quit(1)
+		return
+	print("CONTEXT_OK: ", lab.context_indices.size(), " real props with approximate collision.")
 	print("ITEMS_OK: ", lab.items.size(), " models; mode switch, navigation and actor restoration.")
 	print("SMOKE_OK: ", packs.size(), " packs; ", count, " imported clip variants.")
 	print("TRANSPORT_OK: ", navigation_checks, " scenes; wrap, sync, visibility, playback mode and speed.")

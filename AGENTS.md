@@ -7,3 +7,6 @@ Antes de propor ou implementar qualquer modelo, rig, textura, material, clipe de
 
 ## Sala única de testes
 Nesta primeira etapa, mantenha uma única sala 3D compacta e persistente. Todos os modos de inspeção e testes compartilham essa cena; menus são seletores, não portas para outras salas. Instanciar/remover personagens, peças, equipamentos, objetos e módulos de contexto conforme o teste. Preservar câmera e seleção quando fizer sentido; resetar posição, física e ação de forma determinística ao trocar contexto. Permitir inspeção isolada e combinações, inclusive múltiplos atores quando necessário. Não criar mapas, salas temáticas, corredores ou decoração que não sirva aos testes. Usar peças prontas para compor a sala; não modelar cenário exclusivo. A sala pode ser reconfigurada em dimensão útil para ações de deslocamento sem se tornar um mundo jogável. Não duplicar cenas de laboratório por categoria.
+
+## Publicação Android
+Manter somente o APK mais recente aprovado nas Releases, nome MyGame-Lab-<versão>.apk. Preservar tags, histórico e notas. Remover APKs e checksums anteriores e artefatos CI redundantes apenas após publicação e verificação do novo APK. Não guardar APKs no histórico Git. Rebuilds de tags antigas devem usar artefato temporário, sem substituir a versão publicada.

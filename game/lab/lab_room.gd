@@ -57,6 +57,15 @@ var slot_states := {}
 var hand_bones := [-1, -1]
 var profile_path := "user://grip-profiles-v1.cfg"
 var profile_status := ""
+var context_toggle: Button
+var context_controls: VBoxContainer
+var context_picker: OptionButton
+var context_axis: OptionButton
+var context_label: Label
+var context_indices: Array[int] = []
+var context_root: Node3D
+var context_origin := Vector3(0.0, 0.0, -1.2)
+var context_offset := Vector3.ZERO
 
 func _ready() -> void:
 	var sun := DirectionalLight3D.new()
@@ -111,6 +120,13 @@ func _ready() -> void:
 		if record["pack"] == "medieval_weapons_pack" or name.begins_with("sword") or name.begins_with("axe") or name.begins_with("bow") or name.begins_with("dagger") or name.begins_with("hammer"):
 			equipment_indices.append(i)
 			equipment_picker.add_item(str(record["name"]) + " | " + ("RPG" if record["pack"] == "rpg_items_pack" else "Armas"))
+	for i in range(items.size()):
+		var record: Dictionary = items[i]
+		var name := str(record["name"]).to_lower()
+		if record["pack"] == "rpg_items_pack" and (name.begins_with("chest") or name.begins_with("mineral") or name.begins_with("crystal") or name.begins_with("book")):
+			context_indices.append(i)
+			context_picker.add_item(str(record["name"]))
+	context_toggle.disabled = context_indices.is_empty()
 	mode_picker.set_item_disabled(1, items.is_empty())
 	equipment_toggle.disabled = equipment_indices.is_empty() or not is_instance_valid(skeleton)
 
@@ -236,6 +252,8 @@ func _create_ui() -> void:
 	animation_controls.add_child(equipment_toggle)
 	equipment_toggle.pressed.connect(func():
 		equipment_controls.visible = not equipment_controls.visible
+		if equipment_controls.visible:
+			context_controls.hide()
 		# Keep the controls in the lower part of the screen.
 		catalog_panel.offset_top = -520 if equipment_controls.visible else -355
 	)
@@ -276,6 +294,43 @@ func _create_ui() -> void:
 	equip_label = Label.new()
 	equip_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	equipment_controls.add_child(equip_label)
+	context_toggle = Button.new()
+	context_toggle.text = "Objetos de contexto"
+	animation_controls.add_child(context_toggle)
+	context_toggle.pressed.connect(func():
+		context_controls.visible = not context_controls.visible
+		if context_controls.visible:
+			equipment_controls.hide()
+		catalog_panel.offset_top = -490 if context_controls.visible else -355
+	)
+	context_controls = VBoxContainer.new()
+	context_controls.hide()
+	animation_controls.add_child(context_controls)
+	context_picker = OptionButton.new()
+	context_picker.fit_to_longest_item = false
+	context_picker.add_item("Sem objeto")
+	context_controls.add_child(context_picker)
+	context_picker.item_selected.connect(_choose_context)
+	var context_row := HBoxContainer.new()
+	context_controls.add_child(context_row)
+	context_axis = OptionButton.new()
+	for axis_name in ["X lateral", "Y altura", "Z distância"]:
+		context_axis.add_item(axis_name)
+	context_axis.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	context_row.add_child(context_axis)
+	for direction in [-1, 1]:
+		var step := Button.new()
+		step.text = "−" if direction == -1 else "+"
+		step.custom_minimum_size = Vector2(48, 40)
+		context_row.add_child(step)
+		step.pressed.connect(_adjust_context.bind(direction))
+	var context_reset := Button.new()
+	context_reset.text = "Zerar"
+	context_row.add_child(context_reset)
+	context_reset.pressed.connect(_reset_context)
+	context_label = Label.new()
+	context_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	context_controls.add_child(context_label)
 	details = Label.new()
 	details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	panel.add_child(details)
@@ -572,7 +627,12 @@ func _set_mode(index: int) -> void:
 	mode_picker.select(index)
 	animation_controls.visible = not item_mode
 	item_picker.visible = item_mode
-	catalog_panel.offset_top = -520 if not item_mode and equipment_controls.visible else -355
+	catalog_panel.offset_top = -520 if not item_mode and equipment_controls.visible else (-490 if not item_mode and context_controls.visible else -355)
+	if is_instance_valid(context_root):
+		context_root.visible = not item_mode
+		var body := context_root.get_child(1) as StaticBody3D if context_root.get_child_count() > 1 else null
+		if body != null:
+			body.collision_layer = 0 if item_mode else 1
 	if item_mode:
 		saved_focus = focus
 		saved_distance = distance
@@ -591,6 +651,64 @@ func _set_mode(index: int) -> void:
 		_update_camera()
 		_update_transport()
 		_replay()
+
+func _choose_context(index: int) -> void:
+	if is_instance_valid(context_root):
+		remove_child(context_root)
+		context_root.queue_free()
+	context_root = null
+	context_picker.select(index)
+	context_offset = Vector3.ZERO
+	context_label.text = "Sem objeto"
+	if index <= 0 or index > context_indices.size():
+		return
+	var record: Dictionary = items[context_indices[index - 1]]
+	var packed := load(str(record["path"])) as PackedScene
+	if packed == null:
+		context_label.text = "Falha ao carregar objeto"
+		return
+	var model := packed.instantiate() as Node3D
+	if model == null:
+		return
+	context_root = Node3D.new()
+	add_child(context_root)
+	context_root.add_child(model)
+	var boxes: Array[AABB] = []
+	_collect_bounds(model, boxes)
+	if boxes.is_empty():
+		return
+	var bounds: AABB = boxes[0]
+	for i in range(1, boxes.size()):
+		bounds = bounds.merge(boxes[i])
+	model.position += Vector3(-bounds.get_center().x, -bounds.position.y, -bounds.get_center().z)
+	var body := StaticBody3D.new()
+	context_root.add_child(body)
+	body.position = Vector3(0, bounds.size.y * 0.5, 0)
+	var collision := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = bounds.size.max(Vector3(0.01, 0.01, 0.01))
+	collision.shape = shape
+	body.add_child(collision)
+	context_root.visible = not item_mode
+	_reset_context()
+
+func _adjust_context(direction: int) -> void:
+	if not is_instance_valid(context_root):
+		return
+	var axis := context_axis.selected
+	if axis < 0 or axis > 2:
+		return
+	context_offset[axis] = clampf(context_offset[axis] + 0.05 * direction, -4.0, 4.0)
+	_update_context()
+
+func _reset_context() -> void:
+	context_offset = Vector3.ZERO
+	_update_context()
+
+func _update_context() -> void:
+	if is_instance_valid(context_root):
+		context_root.position = context_origin + context_offset
+		context_label.text = "X %.2f | Y %.2f | Z %.2f m • colisão caixa" % [context_root.position.x, context_root.position.y, context_root.position.z]
 
 func _clear_item() -> void:
 	if is_instance_valid(item_node):
