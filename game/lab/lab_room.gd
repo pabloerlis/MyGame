@@ -2,6 +2,7 @@ extends Node3D
 const Labels = preload("res://lab/labels_pt.gd")
 const EquipmentRules = preload("res://lab/equipment_rules.gd")
 const Demos = preload("res://lab/demo_samples.gd")
+const SeatFit = preload("res://lab/seat_fit.gd")
 var demo_toggle: CheckButton
 var demo_label: Label
 var demo_ready := false
@@ -2648,8 +2649,12 @@ func _apply_demo() -> void:
 			factors.y = clampf(float(sample["height"]) / context_base_size.y, MIN_OBJECT_SCALE, MAX_OBJECT_SCALE)
 			object_scales[context_index_demo] = factors
 			_apply_context_scale()
+		if sample.get("seat", false):
+			_fit_seated_demo()
 		_update_context()
 	demo_state = sample.duplicate(true)
+	if is_instance_valid(context_root) and context_root.has_meta("seat_fit"):
+		demo_state["seatFit"] = context_root.get_meta("seat_fit")
 	demo_state["equipmentAttached"] = is_instance_valid(attachment)
 	demo_state["contextLoaded"] = is_instance_valid(context_root)
 	demo_state["validation"] = "unreviewed"
@@ -2759,3 +2764,84 @@ func _align_push_demo() -> void:
 	demo_state["placementPhase"] = _context_ik_phase()
 	demo_label.text = "Objeto alinhado à posição média das mãos nesta pose; revise altura e contato."
 	_set_settings(false)
+
+## Use a seated idle from this rig where available, so sit/idle/stand share
+## one stationary chair. No chair follows the hips during playback.
+func _fit_seated_demo() -> void:
+	if not is_instance_valid(context_root) or not is_instance_valid(player) or context_base_size.y <= 0.000001:
+		return
+	var pivot := context_root.get_child(0) as Node3D
+	var model := pivot.get_child(0) as Node3D
+	# Remove any previous calibration before measuring the original mesh.
+	if context_root.has_meta("seat_original_transform"):
+		model.transform = context_root.get_meta("seat_original_transform")
+		context_base_size = context_root.get_meta("seat_original_size")
+	else:
+		context_root.set_meta("seat_original_transform", model.transform)
+		context_root.set_meta("seat_original_size", context_base_size)
+	pivot.scale = Vector3.ONE
+	context_root.rotation = Vector3.ZERO
+	var geometry := SeatFit.geometry(context_root, model, context_base_size)
+	var seat: Vector3 = geometry["seat"]
+	var model_forward: Vector3 = geometry["forward"]
+	var reference := selected_clip
+	for clip in clips:
+		if str(clip).get_file().to_lower().begins_with("sitting_idle"):
+			reference = StringName(clip)
+			break
+	player.play(reference)
+	var length: float = player.get_animation(reference).length
+	var best_score := -INF
+	var hip := Vector3(0, actor_height_m * 0.31, 0)
+	var forward := Vector3.FORWARD
+	var phase := 0.5
+	var sampled := false
+	for i in range(13):
+		var fraction := float(i) / 12.0
+		player.seek(length * fraction, true)
+		skeleton.force_update_all_bone_transforms()
+		var pose := SeatFit.pose(skeleton)
+		if pose.is_empty():
+			continue
+		var point: Vector3 = to_local(pose["hip"])
+		var direction: Vector3 = pose["forward"]
+		if not point.is_finite() or point.y < actor_height_m * 0.17 or point.y > actor_height_m * 0.55:
+			continue
+		var score := direction.length() - point.y * 0.35
+		if score > best_score:
+			best_score = score
+			hip = point
+			if direction.length() > actor_height_m * 0.035:
+				forward = direction.normalized()
+			phase = fraction
+			sampled = true
+	# Hip joint sits above the surface; account for stylized pelvis thickness.
+	var seat_height := clampf(hip.y - actor_height_m * 0.055, actor_height_m * 0.19, actor_height_m * 0.34)
+	var factor := seat_height / maxf(seat.y, 0.000001)
+	if not is_finite(factor) or factor <= 0.0:
+		_replay()
+		return
+	model.scale *= factor
+	model.position *= factor
+	context_base_size *= factor
+	var anchor := seat * factor
+	context_root.rotation.y = atan2(forward.x, forward.z) - atan2(model_forward.x, model_forward.z)
+	# Manual scaling is still relative to the calibrated chair.
+	var effective_anchor := anchor * _object_scale(context_record_index)
+	var target := hip + forward * actor_height_m * 0.045
+	target.y = 0.0
+	var shift := context_root.basis * effective_anchor
+	shift.y = 0.0
+	context_offset = target - shift - context_origin
+	context_root.set_meta("seat_fit", {
+		"method": "seat_surface_and_seated_rig",
+		"meshMeasured": geometry["measured"], "poseSampled": sampled,
+		"referenceClip": str(reference), "referencePhase": phase,
+		"seatLocal": _vjson(anchor), "seatHeightM": seat_height,
+		"seatTargetXZ": [target.x, target.z],
+		"hip": _vjson(hip), "forward": _vjson(forward), "baseFactor": factor,
+		"validation": "unreviewed"
+	})
+	_apply_context_scale()
+	_refresh_scale_controls(1)
+	_replay()

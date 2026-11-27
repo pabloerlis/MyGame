@@ -653,6 +653,7 @@ func _test_demo_samples(lab) -> bool:
 	var checks := 0
 	var pistol_found := false
 	var tree_found := false
+	var chair_found := false
 	for i in range(lab.records.size()):
 		lab._load_scene(i)
 		lab.demo_toggle.set_pressed_no_signal(true)
@@ -678,13 +679,25 @@ func _test_demo_samples(lab) -> bool:
 				var item: int = demos.find_item(lab.items, sample["context"])
 				if item < 0 or lab.context_record_index != item or not is_instance_valid(lab.context_root):
 					return false
+			if sample.get("seat", false):
+				var fit: Dictionary = lab.context_root.get_meta("seat_fit", {})
+				if fit.is_empty():
+					return false
+				var v: Array = fit["seatLocal"]
+				var local := Vector3(float(v[0]), float(v[1]), float(v[2])) * lab._object_scale(lab.context_record_index)
+				var world: Vector3 = lab.context_root.to_global(local)
+				var target: Array = fit["seatTargetXZ"]
+				if not world.is_finite() or absf(world.y - float(fit["seatHeightM"])) > 0.01 or Vector2(world.x - float(target[0]), world.z - float(target[1])).length() > 0.01:
+					print("SEAT_FIT_DIAG: ", fit, " world=", world)
+					return false
+				chair_found = true
 			pistol_found = pistol_found or sample.get("item", "") == "survival_pack/Pistol_1"
 			tree_found = tree_found or sample.get("context", "") == "nature_pack/CommonTree_1"
 			checks += 1
 		lab.demo_toggle.set_pressed_no_signal(false)
 		lab._clear_all_equipment()
 		lab._choose_context(0)
-	return checks > 0 and pistol_found and tree_found
+	return checks > 0 and pistol_found and tree_found and chair_found
 
 func _test_gallery(lab) -> bool:
 	var demos = preload("res://lab/demo_samples.gd")

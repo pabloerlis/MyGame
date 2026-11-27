@@ -67,3 +67,6 @@ Inspeção dos accessors POSITION e transformações de nós dos seis GLBs de de
 
 ### Correção após CI alpha.22
 Run 46040185326 passou importação, testes de encaixe relativo, persistência, escala matemática e amostras; falhou na navegação da galeria, também reprovada na alpha.21. A galeria passa a indexar AnimationPlayers importados (IDs efetivos), liberando as instâncias temporárias. Acrescentado diagnóstico e verificação da dimensão efetiva dos seis modelos na cena, além de guarda de seleção na captura. Ajustado ponto do escudo para o lado da geometria de pega (inferência pela extensão de malha; revisão visual pendente). Nenhum APK alpha.22 publicado até a nova CI passar.
+
+## 0.1.0-alpha.23 — encaixe da cadeira
+Feedback Android alpha.22: pistola aprovada visualmente; não alterar sua calibração. Cadeira desproporcional e deslocada. Inferir assento pelas superfícies horizontais do modelo original e direção pelo encosto; amostrar pose sentada do rig, priorizando idle da mesma biblioteca. Escala uniforme pelo contato estimado do quadril; posição fixa no chão e rotação pelo vetor quadril-joelhos. Ajustes manuais continuam relativos à calibração. Exportar metadados da referência no JSON e verificar âncora na CI. A espessura da pelve é aproximada; sem confirmação visual ou correção de penetração dos pés/encosto nesta etapa.

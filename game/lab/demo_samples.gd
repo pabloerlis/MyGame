@@ -17,7 +17,7 @@ static func for_clip(clip: String) -> Dictionary:
 	if c.begins_with("chest_open"):
 		return {"label": "Abrir baú", "context": "rpg_items_pack/Chest_Closed", "z": -0.65}
 	if c.begins_with("sitting_"):
-		return {"label": "Sentar em cadeira", "context": "house_interior_pack/Chair_1", "z": 0.2}
+		return {"label": "Sentar em cadeira", "context": "house_interior_pack/Chair_1", "z": 0.2, "seat": true}
 	if c.begins_with("push"):
 		return {"label": "Empurrar caixote", "context": "medieval_village_pack/Crate", "z": -0.7}
 	if c.begins_with("climbup") or c.begins_with("safetyvault") or c.begins_with("climbledge"):
