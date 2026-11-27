@@ -1,6 +1,19 @@
 extends RefCounted
 ## Presentation labels only. Never use labels as resource keys, bone names or clip IDs.
 const ITEMS := {
+	"pistol_1": "Pistola 1",
+	"pistol_2": "Pistola 2",
+	"revolver_1": "Revólver 1",
+	"revolver_2": "Revólver 2",
+	"revolver_3": "Revólver 3",
+	"shotgun_1": "Espingarda 1",
+	"shotgun_2": "Espingarda 2",
+	"shotgun_sawedoff": "Espingarda curta",
+	"shotgun_shortstock": "Espingarda de coronha curta",
+	"woodlog": "Tronco de madeira",
+	"chair_1": "Cadeira de madeira",
+	"crate": "Caixote",
+	"commontree_1": "Árvore",
 	"armor_black": "Armadura preta",
 	"armor_golden": "Armadura dourada",
 	"armor_leather": "Armadura de couro",
@@ -739,6 +752,10 @@ static func pack(original: String) -> String:
 		"ual2-standard": return "Biblioteca de animações 2"
 		"rpg_items_pack": return "Itens de RPG"
 		"medieval_weapons_pack": return "Armas medievais"
+		"survival_pack": return "Sobrevivência"
+		"house_interior_pack": return "Mobiliário"
+		"medieval_village_pack": return "Vila medieval"
+		"nature_pack": return "Natureza"
 	return "Coleção"
 
 static func scene(record: Dictionary, index: int) -> String:

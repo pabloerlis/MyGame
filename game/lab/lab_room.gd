@@ -1,6 +1,12 @@
 extends Node3D
 const Labels = preload("res://lab/labels_pt.gd")
 const EquipmentRules = preload("res://lab/equipment_rules.gd")
+const Demos = preload("res://lab/demo_samples.gd")
+var demo_toggle: CheckButton
+var demo_label: Label
+var demo_ready := false
+var demo_state := {}
+var demo_button: Button
 const ContactIK = preload("res://lab/contact_ik.gd")
 var support_solver = ContactIK.new()
 const ContextGeometry = preload("res://lab/context_contact.gd")
@@ -237,7 +243,7 @@ func _ready() -> void:
 	for i in range(items.size()):
 		var record: Dictionary = items[i]
 		var name := str(record["name"]).to_lower()
-		if record["pack"] == "rpg_items_pack" and (name.begins_with("chest") or name.begins_with("mineral") or name.begins_with("crystal") or name.begins_with("book")):
+		if (record["pack"] == "rpg_items_pack" and (name.begins_with("chest") or name.begins_with("mineral") or name.begins_with("crystal") or name.begins_with("book"))) or str(record["pack"]) + "/" + str(record["name"]) in ["nature_pack/CommonTree_1", "house_interior_pack/Chair_1", "medieval_village_pack/Crate", "survival_pack/WoodLog"]:
 			context_indices.append(i)
 			context_picker.add_item(Labels.item(str(record["name"]), i))
 	context_toggle.disabled = context_indices.is_empty()
@@ -245,6 +251,13 @@ func _ready() -> void:
 	equipment_toggle.disabled = equipment_indices.is_empty() or not is_instance_valid(skeleton)
 	_refresh_sections()
 	_refresh_picker_labels()
+	demo_ready = true
+	# Start with a visible weapon example instead of an empty idle animation.
+	for i in range(clips.size()):
+		if str(clips[i]).to_lower().contains("pistol_idle"):
+			_select_clip(i)
+			return
+	_apply_demo()
 
 func _create_ui() -> void:
 	var layer := CanvasLayer.new()
@@ -402,6 +415,18 @@ func _create_ui() -> void:
 	clip_picker = OptionButton.new()
 	clip_picker.fit_to_longest_item = false
 	_long_picker(animation_controls, "Movimento", clip_picker)
+	demo_toggle = CheckButton.new()
+	demo_toggle.text = "Demonstrar com objetos automaticamente"
+	demo_toggle.button_pressed = true
+	animation_controls.add_child(demo_toggle)
+	demo_toggle.toggled.connect(func(_value): _apply_demo())
+	demo_button = Button.new()
+	demo_button.text = "Próxima demonstração com objetos"
+	animation_controls.add_child(demo_button)
+	demo_button.pressed.connect(_next_demo)
+	demo_label = Label.new()
+	demo_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	animation_controls.add_child(demo_label)
 	clip_picker.item_selected.connect(_select_clip)
 	compatible_only = CheckButton.new()
 	compatible_only.text = "Somente movimentos compatíveis"
@@ -504,7 +529,11 @@ func _create_ui() -> void:
 	context_picker.fit_to_longest_item = false
 	context_picker.add_item("Sem objeto")
 	_long_picker(context_controls, "Objeto", context_picker)
-	context_picker.item_selected.connect(_choose_context)
+	context_picker.item_selected.connect(func(index: int):
+		demo_toggle.set_pressed_no_signal(false)
+		demo_state = {}
+		_choose_context(index)
+	)
 	var context_row := HBoxContainer.new()
 	context_controls.add_child(context_row)
 	context_axis = OptionButton.new()
@@ -1242,6 +1271,7 @@ func _select_clip(index: int) -> void:
 	clip_picker.select(index)
 	_update_transport()
 	_replay()
+	_apply_demo()
 
 func _step_clip(direction: int) -> void:
 	if item_mode:
@@ -1588,6 +1618,8 @@ func _compatible_clip(index: int) -> bool:
 	return false
 
 func _equip_and_suggest(index: int) -> void:
+	demo_toggle.set_pressed_no_signal(false)
+	demo_state = {}
 	# Hand preference is applied only on user equipment selection; manual bone remains editable.
 	if index > 0 and index <= equipment_indices.size():
 		var category := EquipmentRules.category(str(items[equipment_indices[index - 1]]["name"]))
@@ -1671,6 +1703,7 @@ func _review_entry() -> Dictionary:
 	entry["contextIK"] = _context_ik_snapshot()
 	entry["bodyWarp"] = _warp_snapshot()
 	entry["balance"] = _balance_snapshot()
+	entry["demo"] = {"enabled": demo_toggle.button_pressed, "sample": demo_state.duplicate(true)}
 	entry["notes"] = review_notes.text
 	entry["build"] = ProjectSettings.get_setting("application/config/version")
 	entry["itemScale"] = _vjson(_object_scale(item_index))
@@ -2512,3 +2545,56 @@ func _balance_snapshot() -> Dictionary:
 	for p in balance_feet:
 		feet.append(_vjson(p))
 	return {"enabled": balance_enabled.button_pressed, "limitCm": balance_limit.value, "state": balance_state, "beforeCm": balance_before, "afterCm": balance_after, "requested": _vjson(balance_requested), "trunkCenter": _vjson(balance_center), "footAnchors": feet, "supportRadiusCm": BALANCE_RADIUS * 100.0, "method": "trunk_projection_two_registered_feet"}
+
+func _next_demo() -> void:
+	if item_mode or clips.is_empty():
+		return
+	demo_toggle.set_pressed_no_signal(true)
+	for step in range(1, clips.size() + 1):
+		var index := posmod(clip_index + step, clips.size())
+		if not Demos.for_clip(str(clips[index])).is_empty():
+			_select_clip(index)
+			_set_settings(false)
+			return
+	demo_label.text = "Sem demonstração mapeada nesta biblioteca."
+
+func _apply_demo() -> void:
+	if not demo_ready or not is_instance_valid(demo_toggle) or item_mode or not is_instance_valid(skeleton):
+		return
+	if not demo_toggle.button_pressed:
+		demo_state = {}
+		demo_label.text = "Modo manual. Seus ajustes permanecem disponíveis."
+		return
+	var sample := Demos.for_clip(str(selected_clip))
+	var item_index_demo := Demos.find_item(items, str(sample.get("item", "")))
+	var context_index_demo := Demos.find_item(items, str(sample.get("context", "")))
+	var slot := int(sample.get("slot", 0))
+	# Keep the same attached model and its manual grip across related clips.
+	var same_item := item_index_demo >= 0 and equipped_index == item_index_demo and active_slot == slot and is_instance_valid(attachment)
+	if not same_item:
+		_clear_all_equipment()
+		equipment_picker.select(0)
+		_select_default_bone()
+		if item_index_demo >= 0 and equipment_indices.has(item_index_demo):
+			_switch_slot(slot)
+			_select_default_bone()
+			_choose_equipment(equipment_indices.find(item_index_demo) + 1)
+	# Preserve context scales and corrections when switching within one action.
+	if context_index_demo != context_record_index:
+		_choose_context(context_indices.find(context_index_demo) + 1 if context_index_demo >= 0 and context_indices.has(context_index_demo) else 0)
+	if is_instance_valid(context_root) and context_index_demo >= 0:
+		context_offset = Vector3(0, 0, float(sample.get("z", -1.2)) - context_origin.z)
+		if sample.has("height") and context_base_size.y > 0.001:
+			var factors := _object_scale(context_index_demo)
+			factors.y = clampf(float(sample["height"]) / context_base_size.y, MIN_OBJECT_SCALE, MAX_OBJECT_SCALE)
+			object_scales[context_index_demo] = factors
+			_apply_context_scale()
+		_update_context()
+	demo_state = sample.duplicate(true)
+	demo_state["equipmentAttached"] = is_instance_valid(attachment)
+	demo_state["contextLoaded"] = is_instance_valid(context_root)
+	demo_state["validation"] = "unreviewed"
+	demo_label.text = "Amostra: %s • encaixe e contato a revisar" % str(sample.get("label", "Sem objeto necessário"))
+	if sample.is_empty():
+		demo_label.text = "Sem demonstração mapeada para este movimento."
+	_refresh_picker_labels()

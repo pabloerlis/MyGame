@@ -797,6 +797,108 @@
           "path": "public/glb/medieval_weapons_pack/Sword_Golden.glb"
         }
       ]
+    },
+    {
+      "id": "survival_pack",
+      "license": "CC0-1.0",
+      "files": [
+        {
+          "name": "Pistol_1.glb",
+          "path": "public/glb/survival_pack/Pistol_1.glb",
+          "bytes": 60144,
+          "gitBlob": "955f8cd96f6cd8b1324498b75b842ac28d1e8912"
+        },
+        {
+          "name": "Pistol_2.glb",
+          "path": "public/glb/survival_pack/Pistol_2.glb",
+          "bytes": 67684,
+          "gitBlob": "968b88ae80e1d6ceb5e0336874259504ec17700f"
+        },
+        {
+          "name": "Revolver_1.glb",
+          "path": "public/glb/survival_pack/Revolver_1.glb",
+          "bytes": 58204,
+          "gitBlob": "780ac9dc912491a6a15b0bbc4c1979c728329dc2"
+        },
+        {
+          "name": "Revolver_2.glb",
+          "path": "public/glb/survival_pack/Revolver_2.glb",
+          "bytes": 53812,
+          "gitBlob": "7900af903d989273364dc33c91a1e4241f90124b"
+        },
+        {
+          "name": "Revolver_3.glb",
+          "path": "public/glb/survival_pack/Revolver_3.glb",
+          "bytes": 73808,
+          "gitBlob": "47d8592584d308a8408a530488bd33a66b4af739"
+        },
+        {
+          "name": "Shotgun_1.glb",
+          "path": "public/glb/survival_pack/Shotgun_1.glb",
+          "bytes": 70432,
+          "gitBlob": "c614f2592695d0fffb6a2db8ca922416de9e4190"
+        },
+        {
+          "name": "Shotgun_2.glb",
+          "path": "public/glb/survival_pack/Shotgun_2.glb",
+          "bytes": 55352,
+          "gitBlob": "aea63a951ae3c3df49813f0271ade57747098985"
+        },
+        {
+          "name": "Shotgun_SawedOff.glb",
+          "path": "public/glb/survival_pack/Shotgun_SawedOff.glb",
+          "bytes": 55864,
+          "gitBlob": "0391d0a082275157b32b851ef91defcafc1298db"
+        },
+        {
+          "name": "Shotgun_ShortStock.glb",
+          "path": "public/glb/survival_pack/Shotgun_ShortStock.glb",
+          "bytes": 86348,
+          "gitBlob": "439a23462ef44b8701a227a3d75bbbbd728ea7d4"
+        },
+        {
+          "name": "WoodLog.glb",
+          "path": "public/glb/survival_pack/WoodLog.glb",
+          "bytes": 13904,
+          "gitBlob": "c34ce2ff0767cb9a4abcda1943c8806985098697"
+        }
+      ]
+    },
+    {
+      "id": "house_interior_pack",
+      "license": "CC0-1.0",
+      "files": [
+        {
+          "name": "Chair_1.glb",
+          "path": "public/glb/house_interior_pack/Chair_1.glb",
+          "bytes": 13360,
+          "gitBlob": "05771eb5e5ef1161dda431f70993e8939916cb38"
+        }
+      ]
+    },
+    {
+      "id": "medieval_village_pack",
+      "license": "CC0-1.0",
+      "files": [
+        {
+          "name": "Crate.glb",
+          "path": "public/glb/medieval_village_pack/Crate.glb",
+          "bytes": 35776,
+          "gitBlob": "1643dc194a7141b2cc7eefbbf3e9a871f8b76cc6"
+        }
+      ]
+    },
+    {
+      "id": "nature_pack",
+      "license": "CC0-1.0",
+      "files": [
+        {
+          "name": "CommonTree_1.glb",
+          "path": "public/glb/nature_pack/CommonTree_1.glb",
+          "bytes": 158708,
+          "gitBlob": "1ec431431a6b9ce4ffcefb5460426457f573eafc"
+        }
+      ]
     }
   ]
 }

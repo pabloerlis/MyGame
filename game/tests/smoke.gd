@@ -11,6 +11,9 @@ func _run() -> void:
 	var lab = packed.instantiate()
 	root.add_child(lab)
 	await process_frame
+	lab.demo_toggle.button_pressed = false
+	lab._clear_all_equipment()
+	lab._choose_context(0)
 	if lab.records.size() < 2:
 		push_error("Expected both animation libraries")
 		quit(1)
@@ -76,8 +79,8 @@ func _run() -> void:
 	if packs.size() != 2:
 		quit(1)
 		return
-	if lab.items.size() != 130:
-		push_error("Expected 130 locked RPG and weapon models")
+	if lab.items.size() != 143:
+		push_error("Expected 143 locked models including interaction props")
 		quit(1)
 		return
 	var actor_before: Node3D = lab.actor
@@ -328,7 +331,7 @@ func _run() -> void:
 			push_error("Missing item translation")
 			quit(1)
 			return
-	print("LOCALIZATION_OK: 130 item labels; original clip and bone keys preserved.")
+	print("LOCALIZATION_OK: 143 item labels; original clip and bone keys preserved.")
 	if not pending_clips.is_empty() or not pending_bones.is_empty():
 		push_error("Untranslated names: " + str(pending_clips.keys()) + " / " + str(pending_bones.keys()))
 		quit(1)
@@ -412,7 +415,7 @@ func _run() -> void:
 	# Programmatic assignment does not guarantee TextEdit.text_changed; mirror explicit UI save.
 	lab._save_reviews()
 	var report: Variant = JSON.parse_string(lab._report_json())
-	if not report is Dictionary or report["reviews"].size() != 1 or report["reviews"][0]["notes"] != "Teste de encaixe: mão esquerda" or report["current"]["notes"] != "Observação atual" or report["build"] != "0.1.0-alpha.19" or not report["current"].has("balance") or not report["current"]["bodyWarp"].has("yawDeg") or not report["current"]["contextIK"].has("contacts") or not report["current"].has("bodyWarp") or not report.has("bodyWarpProfiles") or not report["current"].has("contextIK") or not report.has("contextContactProfiles") or not report["current"].has("supportIK") or not report.has("supportProfiles"):
+	if not report is Dictionary or report["reviews"].size() != 1 or report["reviews"][0]["notes"] != "Teste de encaixe: mão esquerda" or report["current"]["notes"] != "Observação atual" or report["build"] != "0.1.0-alpha.20" or not report["current"].has("demo") or not report["current"].has("balance") or not report["current"]["bodyWarp"].has("yawDeg") or not report["current"]["contextIK"].has("contacts") or not report["current"].has("bodyWarp") or not report.has("bodyWarpProfiles") or not report["current"].has("contextIK") or not report.has("contextContactProfiles") or not report["current"].has("supportIK") or not report.has("supportProfiles"):
 		push_error("Review JSON failed")
 		quit(1)
 		return
@@ -475,6 +478,11 @@ func _run() -> void:
 		quit(1)
 		return
 	print("BALANCE_OK: projection, support margin, axis and correction limits.")
+	if not _test_demo_samples(lab):
+		push_error("Demo sample attachment/context failed")
+		quit(1)
+		return
+	print("DEMO_OK: real pistol, bow, axe/tree and chair sample mappings; actual attachment and context loading.")
 	quit(0)
 
 func _test_support_ik() -> bool:
@@ -626,3 +634,32 @@ func _test_balance() -> bool:
 	ok = ok and bal.closest_support(Vector3(0.8, 2, 0), a, b).is_equal_approx(Vector3(0.2, 0, 0))
 	ok = ok and bal.closest_support(Vector3(0.8, 2, 0), a, a).is_equal_approx(Vector3(-0.2, 0, 0))
 	return ok
+
+func _test_demo_samples(lab) -> bool:
+	var demos = preload("res://lab/demo_samples.gd")
+	var checks := 0
+	var pistol_found := false
+	var tree_found := false
+	for i in range(lab.records.size()):
+		lab._load_scene(i)
+		lab.demo_toggle.set_pressed_no_signal(true)
+		for j in range(lab.clips.size()):
+			var sample: Dictionary = demos.for_clip(str(lab.clips[j]))
+			if sample.is_empty():
+				continue
+			lab._select_clip(j)
+			if sample.has("item"):
+				var item: int = demos.find_item(lab.items, sample["item"])
+				if item < 0 or lab.equipped_index != item or not is_instance_valid(lab.attachment):
+					return false
+			if sample.has("context"):
+				var item: int = demos.find_item(lab.items, sample["context"])
+				if item < 0 or lab.context_record_index != item or not is_instance_valid(lab.context_root):
+					return false
+			pistol_found = pistol_found or sample.get("item", "") == "survival_pack/Pistol_1"
+			tree_found = tree_found or sample.get("context", "") == "nature_pack/CommonTree_1"
+			checks += 1
+		lab.demo_toggle.set_pressed_no_signal(false)
+		lab._clear_all_equipment()
+		lab._choose_context(0)
+	return checks > 0 and pistol_found and tree_found

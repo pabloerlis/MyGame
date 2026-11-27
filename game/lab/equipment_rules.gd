@@ -2,6 +2,9 @@ extends RefCounted
 # Classification from stable source names. Suggestions are not authored grip data.
 static func category(name: String) -> String:
 	var n := name.to_lower()
+	if n.begins_with("pistol"): return "pistol"
+	if n.begins_with("revolver"): return "revolver"
+	if n.begins_with("shotgun"): return "shotgun"
 	if n.begins_with("bow"): return "bow"
 	if n.begins_with("shield"): return "shield"
 	if n.begins_with("claymore") or n.begins_with("sword_big"): return "sword_two_handed"
@@ -21,6 +24,9 @@ static func category(name: String) -> String:
 static func matches(name: String, clip: String) -> bool:
 	var c := clip.to_lower()
 	match category(name):
+		"pistol": return c.contains("pistol")
+		"revolver": return c.contains("pistol") and not c.contains("reload")
+		"shotgun": return c.contains("shotgun")
 		"sword": return c.contains("sword")
 		"bow": return c.contains("bow_")
 		"shield": return c.contains("shield")
