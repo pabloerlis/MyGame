@@ -1,0 +1,7 @@
+game/.godot/
+game/.import/
+game/assets/runtime/
+build/
+__pycache__/
+*.pyc
+*.keystore
