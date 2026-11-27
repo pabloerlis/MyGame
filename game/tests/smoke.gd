@@ -684,7 +684,7 @@ func _test_demo_samples(lab) -> bool:
 				if fit.is_empty():
 					return false
 				var v: Array = fit["seatLocal"]
-				var local := Vector3(float(v[0]), float(v[1]), float(v[2])) * lab._object_scale(lab.context_record_index)
+				var local: Vector3 = Vector3(float(v[0]), float(v[1]), float(v[2])) * lab._object_scale(lab.context_record_index)
 				var world: Vector3 = lab.context_root.to_global(local)
 				var target: Array = fit["seatTargetXZ"]
 				if not world.is_finite() or absf(world.y - float(fit["seatHeightM"])) > 0.01 or Vector2(world.x - float(target[0]), world.z - float(target[1])).length() > 0.01:
