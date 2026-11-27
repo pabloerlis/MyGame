@@ -100,7 +100,13 @@ jobs:
           import os, pathlib, re
           preset = pathlib.Path("game/export_presets.cfg").read_text()
           project = pathlib.Path("game/project.godot").read_text()
-          version = re.search(r'^version/name="([0-9A-Za-z.-]+)"        shell: bash
+          version = re.search(r'^version/name="([0-9A-Za-z.-]+)"$', preset, re.M).group(1)
+          assert re.search(r'^config/version="([^"]+)"$', project, re.M).group(1) == version
+          with open(os.environ["GITHUB_ENV"], "a") as env:
+              env.write(f"LAB_VERSION={version}\nAPK_NAME=MyGame-Lab-{version}.apk\n")
+          PY
+      - name: Export and verify APK
+        shell: bash
         run: |
           set -o pipefail
           LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy --path game --export-debug Android "$PWD/build/$APK_NAME" 2>&1 | tee build/export.log
@@ -132,72 +138,6 @@ jobs:
           TAG="lab-alpha-${GITHUB_RUN_ID}"
           gh release create "$TAG" "build/$APK_NAME" build/SHA256SUMS.txt --target "$GITHUB_SHA" --prerelease --title "MyGame Lab $LAB_VERSION" --notes "Automated import, smoke test and signature verification passed. Android ARM64 debug build. Physical-device and visual validation pending. Only the newest validated APK is retained; older source tags remain."
           python3 tools/retain_latest_apk.py "$TAG" "$APK_NAME"
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: lab-diagnostics
-          path: build/*.log
-          if-no-files-found: ignore
-, preset, re.M).group(1)
-          assert re.search(r'^config/version="([^"]+)"        shell: bash
-        run: |
-          set -o pipefail
-          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy --path game --export-debug Android "$PWD/build/MyGame-Lab.apk" 2>&1 | tee build/export.log
-          test -s build/MyGame-Lab.apk
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify build/MyGame-Lab.apk
-          sha256sum build/MyGame-Lab.apk > build/SHA256SUMS.txt
-      - uses: actions/upload-artifact@v4
-        if: success()
-        with:
-          name: MyGame-Lab-Android
-          path: |
-            build/MyGame-Lab.apk
-            build/SHA256SUMS.txt
-            build/*.log
-            game/assets/runtime/catalog.json
-          retention-days: 14
-      - name: Publish directly installable experimental APK
-        if: success() && github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          TAG="lab-alpha-${GITHUB_RUN_ID}"
-          gh release create "$TAG" build/MyGame-Lab.apk build/SHA256SUMS.txt --target "$GITHUB_SHA" --prerelease --title "MyGame Lab experimental ${GITHUB_RUN_ID}" --notes "Automated import, smoke test and signature verification passed. Android ARM64 debug build. Physical-device and visual validation pending."
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: lab-diagnostics
-          path: build/*.log
-          if-no-files-found: ignore
-, project, re.M).group(1) == version
-          with open(os.environ["GITHUB_ENV"], "a") as env:
-              env.write(f"LAB_VERSION={version}\nAPK_NAME=MyGame-Lab-{version}.apk\n")
-          PY
-      - name: Export and verify APK
-        shell: bash
-        run: |
-          set -o pipefail
-          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy --path game --export-debug Android "$PWD/build/MyGame-Lab.apk" 2>&1 | tee build/export.log
-          test -s build/MyGame-Lab.apk
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify build/MyGame-Lab.apk
-          sha256sum build/MyGame-Lab.apk > build/SHA256SUMS.txt
-      - uses: actions/upload-artifact@v4
-        if: success()
-        with:
-          name: MyGame-Lab-Android
-          path: |
-            build/MyGame-Lab.apk
-            build/SHA256SUMS.txt
-            build/*.log
-            game/assets/runtime/catalog.json
-          retention-days: 14
-      - name: Publish directly installable experimental APK
-        if: success() && github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          TAG="lab-alpha-${GITHUB_RUN_ID}"
-          gh release create "$TAG" build/MyGame-Lab.apk build/SHA256SUMS.txt --target "$GITHUB_SHA" --prerelease --title "MyGame Lab experimental ${GITHUB_RUN_ID}" --notes "Automated import, smoke test and signature verification passed. Android ARM64 debug build. Physical-device and visual validation pending."
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
