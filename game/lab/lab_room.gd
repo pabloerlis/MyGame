@@ -51,7 +51,7 @@ func _ready() -> void:
 	if file == null:
 		status.text = "Assets ausentes. Execute o pipeline de aquisição."
 		return
-	var parsed = JSON.parse_string(file.get_as_text())
+	var parsed: Variant = JSON.parse_string(file.get_as_text())
 	if not parsed is Array or parsed.is_empty():
 		status.text = "Catálogo vazio ou inválido."
 		return
@@ -83,7 +83,12 @@ func _create_ui() -> void:
 	var reset := Button.new()
 	reset.text = "Câmera"
 	top.add_child(reset)
-	reset.pressed.connect(func(): yaw = 0.65; pitch = 0.24; distance = 4.0; _update_camera())
+	reset.pressed.connect(func():
+		yaw = 0.65
+		pitch = 0.24
+		distance = 4.0
+		_update_camera()
+	)
 	var bottom := PanelContainer.new()
 	root.add_child(bottom)
 	bottom.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
@@ -114,7 +119,10 @@ func _create_ui() -> void:
 	var pause := Button.new()
 	pause.text = "Pausa"
 	row.add_child(pause)
-	pause.pressed.connect(func(): if is_instance_valid(player): player.pause())
+	pause.pressed.connect(func():
+		if is_instance_valid(player):
+			player.pause()
+	)
 	details = Label.new()
 	details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	panel.add_child(details)
@@ -130,11 +138,11 @@ func _load_scene(index: int) -> void:
 	clips.clear()
 	selected_clip = &""
 	var record: Dictionary = records[index]
-	var packed = load(str(record["path"]))
+	var packed: Resource = load(str(record["path"]))
 	if not packed is PackedScene:
 		status.text = "Falha ao importar asset"
 		return
-	var node = packed.instantiate()
+	var node: Node = packed.instantiate()
 	if not node is Node3D:
 		node.free()
 		status.text = "Cena 3D inválida"
