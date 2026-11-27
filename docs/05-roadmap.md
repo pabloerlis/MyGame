@@ -21,7 +21,8 @@ GitHub Actions com versão fixa do Godot e templates, JDK 17, Android SDK compat
 Separar unitário, integração, smoke em emulador e visual/performance em aparelho físico. Testes mínimos: catálogo sem IDs duplicados; referências resolvidas; clip com duração/tracks válidos; sockets existentes; importação e exportação de review preservam dados; troca repetida sem vazamento aparente; cena não apresenta erro fatal. Logs e métricas com versão/commit e ambiente. Revisão em aparelho físico pelo usuário; nenhuma aprovação visual automatizada presumida.
 
 ## Backlog imediato
-- Inventariar packs gratuitos e validar licença efetiva.
+- Inventariar todo o catálogo Quaternius relevante e validar licença efetiva; adquirir os recursos redistribuíveis, incluindo os não usados no APK inicial.
+- Construir matriz de cobertura de modelos, peças, rigs, animações, efeitos e objetos; pesquisar fontes gratuitas complementares para lacunas. Reportar cobertura real e não criar arte/animações originais sem aprovação explícita.
 - Montar pipeline determinístico e validar clone limpo.
 - Fixar versão estável da engine e configuração Android.
 - Implementar fatia vertical de laboratório com assets reais.
