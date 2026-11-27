@@ -109,6 +109,49 @@ func _run() -> void:
 		push_error("Animation state restoration failed")
 		quit(1)
 		return
+	var equipment_checks := 0
+	for i in range(lab.records.size()):
+		lab._load_scene(i)
+		if lab.skeleton == null or lab.bone_picker.item_count == 0 or lab.equipment_indices.is_empty():
+			push_error("Missing real skeleton or equipment catalog")
+			quit(1)
+			return
+		lab.equipment_picker.item_selected.emit(1)
+		if lab.attachment == null or lab.grip == null or lab.attachment.get_parent() != lab.skeleton:
+			push_error("Equipment attachment failed")
+			quit(1)
+			return
+		var selected_bone: int = lab.bone_picker.get_selected_id()
+		if lab.attachment.bone_name != lab.skeleton.get_bone_name(selected_bone):
+			push_error("Attachment bone mismatch")
+			quit(1)
+			return
+		lab.axis_picker.select(0)
+		lab._adjust_grip(1)
+		if not is_equal_approx(lab.grip.position.x, 0.01):
+			push_error("Grip translation failed")
+			quit(1)
+			return
+		lab.next_button.pressed.emit()
+		if lab.attachment == null or not lab.player.is_playing():
+			push_error("Equipment not preserved during playback")
+			quit(1)
+			return
+		lab.equipment_picker.item_selected.emit(0)
+		lab.equipment_picker.item_selected.emit(1)
+		if lab.grip == null or not is_equal_approx(lab.grip.position.x, 0.01):
+			push_error("Grip calibration restore failed")
+			quit(1)
+			return
+		lab._reset_grip()
+		lab.equipment_picker.item_selected.emit(0)
+		if lab.attachment != null:
+			push_error("Equipment removal failed")
+			quit(1)
+			return
+		equipment_checks += 1
+		await process_frame
+	print("EQUIPMENT_OK: ", equipment_checks, " rigs; attachment, calibration, playback and removal.")
 	print("ITEMS_OK: ", lab.items.size(), " models; mode switch, navigation and actor restoration.")
 	print("SMOKE_OK: ", packs.size(), " packs; ", count, " imported clip variants.")
 	print("TRANSPORT_OK: ", navigation_checks, " scenes; wrap, sync, visibility, playback mode and speed.")

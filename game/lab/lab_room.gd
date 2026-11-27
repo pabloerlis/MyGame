@@ -38,6 +38,19 @@ var saved_focus := Vector3(0, 1, 0)
 var saved_distance := 4.0
 var item_focus := Vector3(0, 1, 0)
 var item_distance := 4.0
+var equipment_controls: VBoxContainer
+var equipment_toggle: Button
+var equipment_picker: OptionButton
+var bone_picker: OptionButton
+var axis_picker: OptionButton
+var equip_label: Label
+var skeleton: Skeleton3D
+var attachment: BoneAttachment3D
+var grip: Node3D
+var equipped_index := -1
+var equipment_indices: Array[int] = []
+var grip_profiles := {}
+var active_profile := ""
 
 func _ready() -> void:
 	var sun := DirectionalLight3D.new()
@@ -85,7 +98,14 @@ func _ready() -> void:
 			items = parsed_items
 	for item in items:
 		item_picker.add_item(str(item["name"]) + " | " + ("RPG" if item["pack"] == "rpg_items_pack" else "Armas"))
+	for i in range(items.size()):
+		var record: Dictionary = items[i]
+		var name := str(record["name"]).to_lower()
+		if record["pack"] == "medieval_weapons_pack" or name.begins_with("sword") or name.begins_with("axe") or name.begins_with("bow") or name.begins_with("dagger") or name.begins_with("hammer"):
+			equipment_indices.append(i)
+			equipment_picker.add_item(str(record["name"]) + " | " + ("RPG" if record["pack"] == "rpg_items_pack" else "Armas"))
 	mode_picker.set_item_disabled(1, items.is_empty())
+	equipment_toggle.disabled = equipment_indices.is_empty() or not is_instance_valid(skeleton)
 
 func _create_ui() -> void:
 	var layer := CanvasLayer.new()
@@ -204,11 +224,55 @@ func _create_ui() -> void:
 	speed_picker.select(2)
 	animation_controls.add_child(speed_picker)
 	speed_picker.item_selected.connect(_set_speed)
+	equipment_toggle = Button.new()
+	equipment_toggle.text = "Equipamentos / encaixe"
+	animation_controls.add_child(equipment_toggle)
+	equipment_toggle.pressed.connect(func():
+		equipment_controls.visible = not equipment_controls.visible
+		# Keep the controls in the lower part of the screen.
+		catalog_panel.offset_top = -480 if equipment_controls.visible else -355
+	)
+	equipment_controls = VBoxContainer.new()
+	equipment_controls.hide()
+	animation_controls.add_child(equipment_controls)
+	equipment_picker = OptionButton.new()
+	equipment_picker.fit_to_longest_item = false
+	equipment_picker.add_item("Sem equipamento")
+	equipment_controls.add_child(equipment_picker)
+	equipment_picker.item_selected.connect(_choose_equipment)
+	bone_picker = OptionButton.new()
+	bone_picker.fit_to_longest_item = false
+	equipment_controls.add_child(bone_picker)
+	bone_picker.item_selected.connect(func(_index): _choose_equipment(equipment_picker.selected))
+	var adjust_row := HBoxContainer.new()
+	equipment_controls.add_child(adjust_row)
+	axis_picker = OptionButton.new()
+	for axis_name in ["Pos X", "Pos Y", "Pos Z", "Rot X", "Rot Y", "Rot Z"]:
+		axis_picker.add_item(axis_name)
+	axis_picker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	adjust_row.add_child(axis_picker)
+	for direction in [-1, 1]:
+		var step_button := Button.new()
+		step_button.text = "−" if direction == -1 else "+"
+		step_button.custom_minimum_size = Vector2(48, 40)
+		adjust_row.add_child(step_button)
+		step_button.pressed.connect(_adjust_grip.bind(direction))
+	var reset_grip := Button.new()
+	reset_grip.text = "Zerar"
+	adjust_row.add_child(reset_grip)
+	reset_grip.pressed.connect(_reset_grip)
+	equip_label = Label.new()
+	equip_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	equipment_controls.add_child(equip_label)
 	details = Label.new()
 	details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	panel.add_child(details)
 
 func _load_scene(index: int) -> void:
+	_clear_equipment()
+	skeleton = null
+	bone_picker.clear()
+	equipment_picker.select(0)
 	if is_instance_valid(player):
 		player.stop()
 		for clip in original_modes:
@@ -239,6 +303,9 @@ func _load_scene(index: int) -> void:
 		return
 	actor = node
 	add_child(actor)
+	skeleton = _find_skeleton(actor)
+	_populate_bones()
+	equipment_toggle.disabled = equipment_indices.is_empty() or not is_instance_valid(skeleton)
 	player = _find_player(actor)
 	if player == null:
 		status.text = "Sem AnimationPlayer"
@@ -258,6 +325,110 @@ func _load_scene(index: int) -> void:
 				break
 		clip_picker.select(start)
 		_select_clip(start)
+
+func _find_skeleton(node: Node) -> Skeleton3D:
+	if node is Skeleton3D:
+		return node
+	for child in node.get_children():
+		var found := _find_skeleton(child)
+		if found != null:
+			return found
+	return null
+
+func _populate_bones() -> void:
+	bone_picker.clear()
+	if not is_instance_valid(skeleton):
+		return
+	# Exact names from the imported skeleton. Prefer hand bones, not fingers.
+	var hands: Array[int] = []
+	var others: Array[int] = []
+	var right_hand := -1
+	for i in range(skeleton.get_bone_count()):
+		var bone_name := str(skeleton.get_bone_name(i))
+		var normalized := bone_name.to_lower().replace("_", "").replace(".", "").replace(":", "").replace("-", "").replace(" ", "")
+		var is_right := normalized.ends_with("righthand") or normalized.ends_with("handr") or normalized.ends_with("rhand") or normalized.ends_with("handright")
+		var is_left := normalized.ends_with("lefthand") or normalized.ends_with("handl") or normalized.ends_with("lhand") or normalized.ends_with("handleft")
+		if is_right or is_left:
+			hands.append(i)
+			if is_right:
+				right_hand = i
+		else:
+			others.append(i)
+	for i in hands + others:
+		bone_picker.add_item(str(skeleton.get_bone_name(i)), i)
+	if right_hand >= 0:
+		bone_picker.select(bone_picker.get_item_index(right_hand))
+	elif bone_picker.item_count > 0:
+		bone_picker.select(0)
+	equip_label.text = "Escolha peça e osso. Ajuste a empunhadura."
+
+func _clear_equipment() -> void:
+	if is_instance_valid(attachment):
+		attachment.get_parent().remove_child(attachment)
+		attachment.queue_free()
+	attachment = null
+	grip = null
+	equipped_index = -1
+	active_profile = ""
+
+func _choose_equipment(index: int) -> void:
+	_clear_equipment()
+	equipment_picker.select(index)
+	if index <= 0:
+		equip_label.text = "Sem equipamento"
+		return
+	if index > equipment_indices.size() or not is_instance_valid(skeleton) or bone_picker.selected < 0:
+		equip_label.text = "Osso ou peça indisponível"
+		return
+	var record_index: int = equipment_indices[index - 1]
+	var record: Dictionary = items[record_index]
+	var bone_index := bone_picker.get_selected_id()
+	var packed := load(str(record["path"])) as PackedScene
+	if packed == null or bone_index < 0 or bone_index >= skeleton.get_bone_count():
+		equip_label.text = "Falha no carregamento"
+		return
+	var model := packed.instantiate()
+	if not model is Node3D:
+		model.free()
+		return
+	attachment = BoneAttachment3D.new()
+	attachment.bone_name = skeleton.get_bone_name(bone_index)
+	skeleton.add_child(attachment)
+	grip = Node3D.new()
+	attachment.add_child(grip)
+	grip.add_child(model)
+	equipped_index = record_index
+	active_profile = "%s|%s|%s" % [records[scene_picker.selected]["id"], record["id"], attachment.bone_name]
+	if grip_profiles.has(active_profile):
+		grip.transform = grip_profiles[active_profile]
+	_update_grip_label()
+
+func _adjust_grip(direction: int) -> void:
+	if not is_instance_valid(grip):
+		return
+	var axis := axis_picker.selected
+	if axis < 0 or axis > 5:
+		return
+	if axis < 3:
+		var offset := grip.position
+		offset[axis] += 0.01 * direction
+		grip.position = offset
+	else:
+		var rotation_offset := grip.rotation_degrees
+		rotation_offset[axis - 3] += 15.0 * direction
+		grip.rotation_degrees = rotation_offset
+	grip_profiles[active_profile] = grip.transform
+	_update_grip_label()
+
+func _reset_grip() -> void:
+	if is_instance_valid(grip):
+		grip.transform = Transform3D.IDENTITY
+		grip_profiles.erase(active_profile)
+		_update_grip_label()
+
+func _update_grip_label() -> void:
+	if is_instance_valid(grip):
+		equip_label.text = "%s | P %.2f %.2f %.2f m | R %.0f %.0f %.0f°" % [attachment.bone_name, grip.position.x, grip.position.y, grip.position.z, grip.rotation_degrees.x, grip.rotation_degrees.y, grip.rotation_degrees.z]
 
 func _find_player(node: Node) -> AnimationPlayer:
 	if node is AnimationPlayer:
@@ -305,6 +476,7 @@ func _set_mode(index: int) -> void:
 	mode_picker.select(index)
 	animation_controls.visible = not item_mode
 	item_picker.visible = item_mode
+	catalog_panel.offset_top = -480 if not item_mode and equipment_controls.visible else -355
 	if item_mode:
 		saved_focus = focus
 		saved_distance = distance
