@@ -56,6 +56,10 @@ var quick_dock_button: Button
 var quick_expand_button: Button
 var quick_choice_pending := false
 var quick_verdict: OptionButton
+const AgentOutfit = preload("res://lab/agent_outfit.gd")
+var agent_outfit_enabled := true
+var agent_outfit: Node3D
+var outfit_picker: OptionButton
 var camera_pan_mode := true
 var camera_gesture_button: Button
 var quick_gesture_button: Button
@@ -506,6 +510,12 @@ func _create_ui() -> void:
 	scene_picker.fit_to_longest_item = false
 	_long_picker(scene_controls, "Personagem / biblioteca", scene_picker)
 	scene_picker.item_selected.connect(_load_scene)
+	outfit_picker = OptionButton.new()
+	outfit_picker.add_item("Visual original")
+	outfit_picker.add_item("Agente — experimental")
+	outfit_picker.select(1 if agent_outfit_enabled else 0)
+	scene_controls.add_child(outfit_picker)
+	outfit_picker.item_selected.connect(_set_agent_outfit)
 	_section_heading(animation_controls, "Animação", "Selecione o movimento e como ele será reproduzido.")
 	clip_picker = OptionButton.new()
 	clip_picker.fit_to_longest_item = false
@@ -1198,6 +1208,8 @@ func _load_scene(index: int) -> void:
 		if actor_box.size.y > 0.05 and actor_box.size.y < 20.0:
 			actor_height_m = actor_box.size.y
 	skeleton = _find_skeleton(actor)
+	agent_outfit = null
+	_apply_agent_outfit()
 	_populate_bones()
 	equipment_toggle.disabled = equipment_indices.is_empty() or not is_instance_valid(skeleton)
 	player = _find_player(actor)
@@ -1219,6 +1231,22 @@ func _load_scene(index: int) -> void:
 				break
 		clip_picker.select(start)
 		_select_clip(start)
+
+func _set_agent_outfit(index: int) -> void:
+	agent_outfit_enabled = index == 1
+	if is_instance_valid(outfit_picker):
+		outfit_picker.select(index)
+	_apply_agent_outfit()
+
+func _apply_agent_outfit() -> void:
+	if not is_instance_valid(actor):
+		return
+	if is_instance_valid(agent_outfit):
+		agent_outfit.free()
+		agent_outfit = null
+	AgentOutfit.restore(actor)
+	if agent_outfit_enabled and is_instance_valid(skeleton):
+		agent_outfit = AgentOutfit.apply(actor, skeleton)
 
 func _find_skeleton(node: Node) -> Skeleton3D:
 	if node is Skeleton3D:
@@ -1985,6 +2013,7 @@ func _review_entry() -> Dictionary:
 	entry["demo"] = {"enabled": demo_toggle.button_pressed, "sample": demo_state.duplicate(true)}
 	entry["notes"] = review_notes.text
 	entry["build"] = ProjectSettings.get_setting("application/config/version")
+	entry["outfit"] = "agent_prototype" if agent_outfit_enabled else "original"
 	entry["itemScale"] = _vjson(_object_scale(item_index))
 	entry["contextScale"] = _vjson(_object_scale(context_record_index))
 	entry["contextPosition"] = _vjson(context_root.position) if is_instance_valid(context_root) else []
@@ -3455,6 +3484,7 @@ func _rebuild_quick_controls() -> void:
 		1:
 			if quick_page == 1:
 				_quick_button(row, "Trocar corpo", func(): _quick_choose(scene_picker, "Personagem"))
+				_quick_button(row, "Vestimenta", func(): _quick_choose(outfit_picker, "Vestimenta"))
 				_quick_button(row, "Focar", _focus_selected)
 				row = _quick_row()
 				_quick_button(row, "Osso", func(): _quick_choose(contact_picker, "Osso de referência"))

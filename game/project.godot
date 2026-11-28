@@ -3,7 +3,7 @@ config_version=5
 
 [application]
 config/name="MyGame Lab"
-config/version="0.1.0-alpha.31"
+config/version="0.1.0-alpha.32"
 run/main_scene="res://bootstrap/runtime.tscn"
 config/icon="res://branding/erlis.png"
 boot_splash/show_image=true

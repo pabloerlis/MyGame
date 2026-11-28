@@ -398,6 +398,20 @@ func _run() -> void:
 		return
 	DirAccess.remove_absolute(lab.settings_preferences_path)
 	print("TRANSPARENCY_OK: background alpha, disk round-trip and live playback.")
+	# Appearance is reversible without touching the animation or skeleton.
+	var original_skeleton: Skeleton3D = lab.skeleton
+	var original_clip_count: int = lab.clips.size()
+	lab._set_agent_outfit(0)
+	if lab.agent_outfit_enabled or is_instance_valid(lab.agent_outfit):
+		push_error("Original outfit restoration failed")
+		quit(1)
+		return
+	lab._set_agent_outfit(1)
+	if not lab.agent_outfit_enabled or lab.skeleton != original_skeleton or lab.clips.size() != original_clip_count or lab._review_entry().get("outfit") != "agent_prototype":
+		push_error("Agent outfit must preserve rig and animation catalog")
+		quit(1)
+		return
+	print("OUTFIT_OK: original/agent selector, unchanged skeleton and clips.")
 	# Responsive width after actual layout, not just a clipping mask.
 	lab._set_settings(true)
 	for section in range(6):
